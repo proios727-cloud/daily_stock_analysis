@@ -11,7 +11,7 @@
   - Web 前端改动在 `apps/dsa-web/`
   - 桌面端改动在 `apps/dsa-desktop/`
   - 部署与流水线改动在 `scripts/`、`.github/workflows/`、`docker/`
-- 未经明确确认，不执行 `git commit`、`git tag`、`git push`。
+- 本地交互会话中，未经明确确认不执行 `git commit`、`git tag`、`git push`。云端会话可在其指定的工作分支上提交、推送并创建 draft PR；`git tag`、强制推送和推送到其他分支仍需明确确认。
 - commit message 使用英文，不添加 `Co-Authored-By`。
 - 不写死密钥、账号、路径、模型名、端口或环境差异逻辑。
 - 优先复用现有模块、配置入口、脚本和测试，不新增平行实现。
@@ -47,6 +47,10 @@
 - `CLAUDE.md` 必须是指向 `AGENTS.md` 的软链接，用于兼容 Claude 生态。
 - `.github/copilot-instructions.md` 与 `.github/instructions/*.instructions.md` 是 GitHub Copilot / Coding Agent 的镜像或分层补充；若与本文件冲突，以 `AGENTS.md` 为准。
 - 仓库协作 skill 存放在 `.claude/skills/`，分析产物存放在 `.claude/reviews/`；前者可以入库，后者默认视为本地产物。
+- 仓库共享的 Claude Code 项目设置存放在 `.claude/settings.json`（会话默认模型），子 agent 定义存放在 `.claude/agents/`；二者可以入库，`.claude/` 下其余内容仍视为本地产物。
+- 模型分层以“够用即可”为原则：主会话负责规划、高风险区域的语义判断与最终交付；`scout`（轻量模型）负责只读检索与取证；`implementer`（中档模型）负责范围已明确的常规实现与验证；`reviewer`（沿用主会话模型）负责高风险改动合入前的独立审查。几次工具调用即可完成的小任务由主会话直接处理，不为委派而委派。
+- 会话默认使用中档模型处理日常编码、审查与检查；只有规划、架构、根因分析或超出单次会话的大任务才切换到最高档模型（例如通过专门的编排 skill 或 `/model`）。
+- 子 agent 的模型在各自 frontmatter 中用别名声明（`haiku` / `sonnet` / `inherit`），不写具体版本号；调整分层时只改对应 agent 文件与本节说明。
 - 根目录 `SKILL.md` 与 `docs/openclaw-skill-integration.md` 属于产品或外部集成说明，不是仓库协作规则真源。
 - 若未来新增 `.agents/skills/` 或其他 agent 专用目录，必须先明确单一真源，再通过脚本或镜像同步；禁止手工长期维护多份同义内容。
 - 修改 AI 协作治理资产时，执行：
@@ -151,7 +155,7 @@ gh run view <run_id> --log-failed
 
 | 检查项 | 来源 | 说明 | 是否阻断 |
 | --- | --- | --- | --- |
-| `ai-governance` | `.github/workflows/ci.yml` | 校验 `AGENTS.md` / `CLAUDE.md` / `.github` 指令 / `.claude/skills` 关系 | 是 |
+| `ai-governance` | `.github/workflows/ci.yml` | 校验 `AGENTS.md` / `CLAUDE.md` / `.github` 指令 / `.claude/skills` / `.claude/agents` 关系 | 是 |
 | `backend-gate` | `.github/workflows/ci.yml` | 执行 `./scripts/ci_gate.sh` | 是 |
 | `docker-build` | `.github/workflows/ci.yml` | Docker 构建与关键模块导入 smoke | 是 |
 | `web-gate` | `.github/workflows/ci.yml` | 前端改动时执行 `npm run lint` + `npm run build` | 是（触发时） |
@@ -184,7 +188,7 @@ gh run view <run_id> --log-failed
   - 若涉及登录、Cookie、会话、轮询状态、字段增删或枚举变化，必须明确写出兼容性影响。
 
 - 文档与治理文件改动：
-  - 适用范围：`README.md`、`docs/**`、`AGENTS.md`、`.github/copilot-instructions.md`、`.github/instructions/**`、`.claude/skills/**`
+  - 适用范围：`README.md`、`docs/**`、`AGENTS.md`、`.github/copilot-instructions.md`、`.github/instructions/**`、`.claude/skills/**`、`.claude/agents/**`、`.claude/settings.json`
   - 不强制代码测试。
   - 需确认命令、配置项、文件名、工作流名称与实际仓库一致。
   - 改动 AI 协作治理资产时，执行 `python scripts/check_ai_assets.py`。

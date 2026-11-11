@@ -13,6 +13,7 @@ CLAUDE = ROOT / "CLAUDE.md"
 COPILOT = ROOT / ".github" / "copilot-instructions.md"
 INSTRUCTIONS_DIR = ROOT / ".github" / "instructions"
 CLAUDE_SKILLS_DIR = ROOT / ".claude" / "skills"
+CLAUDE_AGENTS_DIR = ROOT / ".claude" / "agents"
 
 REQUIRED_INSTRUCTION_FILES = {
     "backend.instructions.md",
@@ -31,6 +32,9 @@ REQUIRED_GITIGNORE_SNIPPETS = (
     ".claude/*",
     "!.claude/skills/",
     "!.claude/skills/**",
+    "!.claude/agents/",
+    "!.claude/agents/**",
+    "!.claude/settings.json",
 )
 
 
@@ -90,6 +94,14 @@ def ensure_skill_files() -> None:
                 fail(f"{path.relative_to(ROOT)} must reference AGENTS.md as the rule source")
 
 
+def ensure_agent_files() -> None:
+    if not CLAUDE_AGENTS_DIR.exists():
+        return
+    for path in sorted(CLAUDE_AGENTS_DIR.glob("*.md")):
+        if "AGENTS.md" not in path.read_text(encoding="utf-8"):
+            fail(f"{path.relative_to(ROOT)} must reference AGENTS.md as the rule source")
+
+
 def ensure_gitignore_rules() -> None:
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
     for snippet in REQUIRED_GITIGNORE_SNIPPETS:
@@ -106,11 +118,12 @@ def ensure_no_tracked_claude_artifacts() -> None:
         check=True,
     )
     tracked = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    allowed_prefixes = (".claude/skills/",)
+    allowed_prefixes = (".claude/skills/", ".claude/agents/")
+    allowed_files = {".claude/settings.json"}
     for path in tracked:
-        if path.startswith(allowed_prefixes):
+        if path.startswith(allowed_prefixes) or path in allowed_files:
             continue
-        fail(f"tracked .claude artifact outside skills/: {path}")
+        fail(f"tracked .claude artifact outside shared assets: {path}")
 
 
 def main() -> None:
@@ -118,6 +131,7 @@ def main() -> None:
     ensure_copilot_entry()
     ensure_instruction_files()
     ensure_skill_files()
+    ensure_agent_files()
     ensure_gitignore_rules()
     ensure_no_tracked_claude_artifacts()
     print("[ai-assets] OK")
