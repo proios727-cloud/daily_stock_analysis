@@ -1,5 +1,5 @@
 ---
-applyTo: "README.md,docs/**,AGENTS.md,CLAUDE.md,.github/**,.claude/skills/**,scripts/**,docker/**"
+applyTo: "README.md,docs/**,AGENTS.md,CLAUDE.md,.github/**,.claude/skills/**,.claude/agents/**,.claude/settings.json,scripts/**,docker/**"
 ---
 
 # Governance Instructions
