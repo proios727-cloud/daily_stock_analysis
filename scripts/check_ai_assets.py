@@ -26,6 +26,7 @@ REQUIRED_SKILL_FILES = {
     "analyze-issue/SKILL.md",
     "analyze-pr/SKILL.md",
     "fix-issue/SKILL.md",
+    "brain/SKILL.md",
 }
 
 REQUIRED_GITIGNORE_SNIPPETS = (

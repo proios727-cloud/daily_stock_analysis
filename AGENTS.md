@@ -47,10 +47,10 @@
 - `CLAUDE.md` 必须是指向 `AGENTS.md` 的软链接，用于兼容 Claude 生态。
 - `.github/copilot-instructions.md` 与 `.github/instructions/*.instructions.md` 是 GitHub Copilot / Coding Agent 的镜像或分层补充；若与本文件冲突，以 `AGENTS.md` 为准。
 - 仓库协作 skill 存放在 `.claude/skills/`，分析产物存放在 `.claude/reviews/`；前者可以入库，后者默认视为本地产物。
-- 仓库共享的 Claude Code 项目设置存放在 `.claude/settings.json`（会话默认模型），子 agent 定义存放在 `.claude/agents/`；二者可以入库，`.claude/` 下其余内容仍视为本地产物。
-- 模型分层以“够用即可”为原则：主会话负责规划、高风险区域的语义判断与最终交付；`scout`（轻量模型）负责只读检索与取证；`implementer`（中档模型）负责范围已明确的常规实现与验证；`reviewer`（沿用主会话模型）负责高风险改动合入前的独立审查。几次工具调用即可完成的小任务由主会话直接处理，不为委派而委派。
-- 会话默认使用中档模型处理日常编码、审查与检查；只有规划、架构、根因分析或超出单次会话的大任务才切换到最高档模型（例如通过专门的编排 skill 或 `/model`）。
-- 子 agent 的模型在各自 frontmatter 中用别名声明（`haiku` / `sonnet` / `inherit`），不写具体版本号；调整分层时只改对应 agent 文件与本节说明。
+- 仓库共享的 Claude Code 项目设置存放在 `.claude/settings.json`（会话默认模型与 advisor 模型），子 agent 定义存放在 `.claude/agents/`；二者可以入库，`.claude/` 下其余内容仍视为本地产物。
+- 模型分层以“够用即可”为原则：主会话负责规划、高风险区域的语义判断与最终交付；`scout`（轻量模型）负责只读检索与取证；`implementer`（中档模型）负责范围已明确的常规实现与验证；`reviewer`（沿用主会话模型）负责高风险改动合入前的独立审查；`brain`（最高档模型、高 effort）只读、不写代码，仅在方案锁定前、同一错误重复出现、宣布完成前这三个决策点被调用；`sonnet-checker`（中档模型）只读，负责把交付物中的数值与结论对照新鲜数据源或实际命令输出逐项核对。几次工具调用即可完成的小任务由主会话直接处理，不为委派而委派。
+- 会话默认使用中档模型处理日常编码、审查与检查；只有规划、架构、根因分析或超出单次会话的大任务才切换到最高档模型（例如通过 `/brain` 编排 skill 调用 `brain` agent，或 `/model`）；`.claude/settings.json` 中的 `advisorModel` 为实验性能力，会话不支持时自动忽略。
+- 子 agent 的模型在各自 frontmatter 中用别名声明（`haiku` / `sonnet` / `fable` / `inherit`），`effort` 同样只在 frontmatter 声明，不写具体版本号；调整分层时只改对应 agent 文件与本节说明。
 - 根目录 `SKILL.md` 与 `docs/openclaw-skill-integration.md` 属于产品或外部集成说明，不是仓库协作规则真源。
 - 若未来新增 `.agents/skills/` 或其他 agent 专用目录，必须先明确单一真源，再通过脚本或镜像同步；禁止手工长期维护多份同义内容。
 - 修改 AI 协作治理资产时，执行：
@@ -233,6 +233,7 @@ gh run view <run_id> --log-failed
   - `.claude/skills/analyze-issue/SKILL.md`
   - `.claude/skills/analyze-pr/SKILL.md`
   - `.claude/skills/fix-issue/SKILL.md`
+  - `.claude/skills/brain/SKILL.md`
 - 如果任务明确是 issue 分析、PR 审查、issue 修复，优先按对应 skill 执行，并将产物保存到 `.claude/reviews/`。
 - skill 中的命令、模板、验证顺序和交付结构必须与 `AGENTS.md` 保持一致。
 - 每次进行 PR 创建 / 更新、PR 审查或 issue 分析前，必须先同步最新代码基线：先检查工作区状态并执行 `git fetch --all --prune`；若工作区干净且当前分支可 fast-forward，则执行 `git pull --ff-only`。如存在本地改动、冲突状态、未跟踪风险文件或无法 fast-forward，不得强行切分支、stash、reset 或覆盖本地状态；PR 审查 / issue 分析可改用已 fetch 的远端 refs/PR head 做分析，并在分析文档中明确记录未更新本地工作树的原因、当前本地 HEAD 与使用的远端基线；PR 创建 / 更新应先说明当前分支与目标基线差异，必要时请求用户确认 rebase、merge 或继续基于当前分支推进。
