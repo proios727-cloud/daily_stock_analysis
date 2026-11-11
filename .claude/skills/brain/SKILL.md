@@ -18,8 +18,9 @@ Run a task with the top-tier model used only at decision points. The rule source
 | Role | Agent | Model | Does |
 | --- | --- | --- | --- |
 | Decide | advisor, else `brain` | top tier, high effort | Plans, diagnoses a repeated error, reviews before "done". Never edits files. |
-| Build | main session or `implementer` | mid tier | Makes the changes and runs the checks. Data pulls that must be copied exactly, such as an option-chain map, also run at mid tier, never the light tier. |
-| Search | `scout` | light | Read-only lookup, in parallel when there are several questions. |
+| Build | main session or `implementer` | mid tier | Makes the changes and runs the checks. |
+| Build data | `map-builder` | mid tier | Pulls data that must be copied exactly, such as an option-chain map, and runs the named script on it. Never the light tier. |
+| Search | `scout`, or any agent without its own model | light | Read-only lookup and research, several in parallel when there are several questions. Agents that declare no model run at the light tier by default. |
 | Check | `opus-checker` | upper tier | Judges what was built against the plan and done criteria, right after the build. |
 | Verify | `sonnet-checker` | mid tier | Compares delivered values and claims against fresh sources. |
 | Review | `reviewer` | main session model | Second look at high-risk changes before merge. |
@@ -29,7 +30,7 @@ Models and effort are set in each agent's frontmatter under `.claude/agents/`, n
 ## Steps
 
 1. Restate the task and its done criteria. If it takes only a few tool calls, do it directly and skip the rest: `AGENTS.md` says not to delegate for its own sake.
-2. Gather facts. Use `scout` for lookups that span many files; do small lookups yourself.
+2. Gather facts. Use `scout` or a swarm of light-tier agents for lookups that span many files or sources; do small lookups yourself. Use `map-builder` when the facts are data that must be copied exactly.
 3. Lock the plan. Consult the advisor if one is attached to the session; otherwise send `brain` the task, the done criteria, what was found and what is ruled out. Do not start building until the plan is back. If the plan hits a high-risk area or changes scope, show it to the user first.
 4. Build. Follow the plan; keep changes minimal and inside the directory boundaries in `AGENTS.md` section 1.
 5. Go back to the advisor (or `brain`) only when the same error has occurred twice, or before declaring done. A plan that has to change goes through step 3 again. Plan lock, repeated error and pre-done review are the whole budget for the top-tier model.
