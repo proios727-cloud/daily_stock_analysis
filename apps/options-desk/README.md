@@ -25,7 +25,7 @@ The page can call only those ten read tools. No order, preview, cancel or exerci
 
 - Open the page in claude.ai while signed in and allow the three connectors when asked.
 - Prices, VWAP, RSI, contract quotes, account value and positions refresh about every 30 seconds while the page is visible.
-- The liquidity rank refreshes every two minutes. The page opens on the top pick until you tap a ticker.
+- The liquidity rank refreshes every two minutes. The page opens on the top pick once and never switches ticker on its own after that.
 - **Refresh** re-pulls every panel at once. Each panel shows the time of its last pull.
 - Dealer levels are computed once per trading day and kept in the browser. **Recompute levels** rebuilds them. The first build of the day can take up to a minute.
 - Earnings and the economic calendar load once per page open.

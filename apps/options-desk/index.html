@@ -196,7 +196,7 @@ details .doc ul{margin:4px 0;padding-left:18px}
       <ul>
         <li>Prices, VWAP and RSI update on their own about every 30 seconds while the page is visible. Contract quotes, account value and positions update on the same beat.</li>
         <li>Refresh re-pulls every panel at once. Each panel shows the time of its last successful pull.</li>
-        <li>The liquidity rank and top pick refresh every two minutes and on Refresh. The page opens on the top pick until you tap a ticker yourself.</li>
+        <li>The liquidity rank and top pick refresh every two minutes and on Refresh. The page opens on the top pick once; after that it never switches ticker on its own.</li>
         <li>Dealer levels are computed once per trading day and kept in this browser. Recompute levels rebuilds them from the chain as it stands now; the first build of the day takes up to a minute because SPY and QQQ carry several hundred contracts.</li>
         <li>Earnings dates and the economic calendar load once per page open.</li>
         <li>Choose your account once in Open positions. The page remembers it in this browser; no account number is stored in the page itself.</li>
@@ -433,7 +433,7 @@ if (typeof module !== "undefined") module.exports = GEX;
       !L ? "No top pick: every ranked ticker has earnings inside three sessions." :
       "Top pick now: <b>" + esc(S.pick) + "</b>. Its at-the-money options (" + f(L.strike, L.strike % 1 ? 1 : 0) + " strike, " + esc(L.exps.join(" and ")) + ") have traded <span class=\"num\">" + big(L.vol) + "</span> contracts today at an average <span class=\"num\">" + (L.spread == null ? "—" : f(L.spread, 1) + "%") + "</span> spread" + (syms.length < SYMS.length ? ", best of the " + syms.length + " ranked so far." : ", the best mix of the six.") + " Checked " + etTime(L.asof) + " ET.";
     renderUnder();
-    if (S.pick && !S.userPicked && S.pick !== S.sym) { S.sym = S.pick; S.exp = null; renderUnder(); renderLevels(); loadChain(); }
+    if (S.pick && !S.userPicked && !S.autoDone) { S.autoDone = true; if (S.pick !== S.sym) { S.sym = S.pick; S.exp = null; renderUnder(); renderLevels(); loadChain(); } }
   }
   function scanAll() { return Promise.all(SYMS.map(scanOne)).then(rankLiq); }
 
@@ -704,13 +704,13 @@ if (typeof module !== "undefined") module.exports = GEX;
     var b = ev.target.closest(".tile"); if (!b) return; S.userPicked = true; if (b.dataset.sym === S.sym) return;
     S.sym = b.dataset.sym; S.exp = null; renderUnder(); renderLevels(); if (S.mcp) loadChain();
   });
-  $("exp").addEventListener("change", function () { S.exp = this.value; S.sel = null; S.rows = []; S.pq = {}; renderPlan(); if (S.mcp) loadStrikes(++S.tok); });
+  $("exp").addEventListener("change", function () { S.userPicked = true; S.exp = this.value; S.sel = null; S.rows = []; S.pq = {}; renderPlan(); if (S.mcp) loadStrikes(++S.tok); });
   ["call", "put"].forEach(function (side) {
     $("seg-" + side).addEventListener("click", function () {
       S.side = side; $("chain").className = "chain show-" + side;
       $("seg-call").setAttribute("aria-pressed", side === "call"); $("seg-put").setAttribute("aria-pressed", side === "put");
     });
-    $("tb-" + side).addEventListener("click", function (ev) { var b = ev.target.closest(".pick"); if (!b) return; S.sel = b.dataset.id; renderPicker(); renderPlan(); });
+    $("tb-" + side).addEventListener("click", function (ev) { var b = ev.target.closest(".pick"); if (!b) return; S.userPicked = true; S.sel = b.dataset.id; renderPicker(); renderPlan(); });
   });
   $("acct").addEventListener("change", function () { S.account = this.value || null; store.set("osd:acct", S.account); S.portfolio = null; S.positions = null; renderPositions(); renderPlan(); if (S.mcp) loadPositions(); });
   $("refresh").addEventListener("click", function () {
