@@ -14,8 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] Telegram 推送按 UTF-16 长度判断与分段，修复含大量 emoji 的报告超出 4096 限制导致发送失败的问题。
 - [chore] 新增 `/brain` 编排 skill 与只读子 agent `brain`（最高档模型、高 effort，仅用于决策点）、`opus-checker`（构建后检查）、`sonnet-checker`（数值核对），并在 `.claude/settings.json` 声明实验性 `advisorModel`。
 - [chore] 子 agent 默认模型设为轻量档（`env.CLAUDE_CODE_SUBAGENT_MODEL`），新增中档 `map-builder` 负责需逐字复制的数据拉取。
-- [新功能] 新增 `apps/options-desk/` 独立单页只读期权看板原型（SPY/QQQ/NVDA/TSLA/AMD/META 单腿期权：流动性排名、做市商关键位、合约选择、交易计划、持仓与事件），与现有分析系统无代码或构建耦合。
-- [改进] `apps/options-desk/` 看板：做市商关键位改为超过 30 分钟即重建，到期时间按纽约 16:00 计算，新增数值化门槛检查表与页面内置记录（desk log）。
 
 ## [3.33.0] - 2026-10-15
 
