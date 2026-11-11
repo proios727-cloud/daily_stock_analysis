@@ -82,6 +82,7 @@ verify_*.py
 .claude/*
 !.claude/skills/
 !.claude/skills/**
+!.claude/settings.json
 
 # ignore static files
 static/
