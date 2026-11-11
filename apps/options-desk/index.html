@@ -1,0 +1,748 @@
+<title>Single-Leg Options Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&display=swap">
+<style>
+/* Layout: one scrolling column of six numbered-by-purpose panels; a sticky clock bar on top carries the 3:45 PM ET exit countdown. */
+:root{
+  --bg:#f2f4f8; --surface:#ffffff; --sunk:#e9edf3; --ink:#141b26; --muted:#5a6676; --line:#d9dfe8;
+  --accent:#2b5bd1; --accent-ink:#ffffff; --up:#0b8457; --down:#c43535; --warn:#9a6508; --warn-bg:#fbefd3;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d121a; --surface:#151c27; --sunk:#1c2532; --ink:#e7ecf3; --muted:#8f9bad; --line:#273143;
+  --accent:#7ea6ff; --accent-ink:#0d121a; --up:#42d19a; --down:#ff7d7d; --warn:#f1bb5c; --warn-bg:#3a2c0e; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0d121a; --surface:#151c27; --sunk:#1c2532; --ink:#e7ecf3; --muted:#8f9bad; --line:#273143;
+  --accent:#7ea6ff; --accent-ink:#0d121a; --up:#42d19a; --down:#ff7d7d; --warn:#f1bb5c; --warn-bg:#3a2c0e; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.num,td,.v{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)} .muted{color:var(--muted)}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surface);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding-block:10px}
+h1{font-family:var(--cond);font-size:18px;font-weight:600;margin:0;letter-spacing:.01em}
+.top .sp{flex:1 1 auto}
+.clock{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.exit{font-family:var(--mono);font-size:13px;padding:3px 9px;border-radius:999px;background:var(--sunk);white-space:nowrap}
+.exit.soon{background:var(--warn-bg);color:var(--warn)}
+button,select{font:inherit;color:inherit}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:6px 12px;font-weight:500;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.btn:focus-visible,select:focus-visible,.tile:focus-visible,.pick:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 8px;max-width:100%}
+
+main.wrap{display:flex;flex-direction:column;gap:22px;padding-block:18px 40px}
+.banner{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:10px 12px}
+section{min-width:0}
+.head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;margin-bottom:8px}
+h2{font-family:var(--cond);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin:0;color:var(--muted)}
+.head .ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-left:auto}
+.src{font-size:11.5px;color:var(--muted);margin:6px 0 0}
+.err{font-size:12.5px;color:var(--down);margin:6px 0 0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px}
+
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+@media (max-width:1000px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:520px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0}
+.tile[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tile .sym{font-family:var(--cond);font-weight:600;font-size:14px;display:flex;justify-content:space-between;gap:6px}
+.tile .px{font-family:var(--mono);font-size:19px;font-weight:500}
+.tile .chg{font-family:var(--mono);font-size:12.5px}
+.tile dl{display:grid;grid-template-columns:auto 1fr;gap:1px 8px;margin:4px 0 0;font-size:12px}
+.tile dt{color:var(--muted)} .tile dd{margin:0;text-align:right;font-family:var(--mono)}
+.chip{font-family:var(--sans);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.chip.pos{color:var(--up)} .chip.neg{color:var(--down)}
+.chip.top{background:var(--accent);color:var(--accent-ink)}
+.pickline{margin:0 0 10px;font-size:15px;max-width:70ch}
+.pickline b{font-family:var(--cond)}
+.tile .liq{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:5px;min-height:18px}
+
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{font-family:var(--sans);font-weight:500;color:var(--muted);text-align:right;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:11.5px}
+td{text-align:right;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+th:first-child,td:first-child{text-align:left}
+td.t{font-family:var(--sans)}
+td[colspan]{text-align:left}
+tr.sel td{background:var(--sunk)}
+tr.atm td{border-top:2px solid var(--accent)}
+tr.wide td.spr{color:var(--warn)}
+.pick{background:none;border:0;padding:0;font-family:var(--mono);font-weight:600;color:var(--accent);cursor:pointer}
+
+.bar{position:relative;height:74px;margin:14px 8px 0}
+.bar .axis{position:absolute;left:0;right:0;top:36px;height:2px;background:var(--line)}
+.bar .mk{position:absolute;transform:translateX(-50%);font-family:var(--mono);font-size:11px;white-space:nowrap;text-align:center}
+.bar .mk::after{content:"";position:absolute;left:50%;width:2px;height:12px;background:currentColor}
+.bar .mk.hi{top:0} .bar .mk.hi::after{top:26px}
+.bar .mk.lo{top:44px} .bar .mk.lo::after{top:-14px}
+.bar .mk b{display:block;font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.bar .spot{color:var(--accent)} .bar .cw{color:var(--up)} .bar .pw{color:var(--down)} .bar .fl{color:var(--warn)}
+
+.chain{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.chain h3{font-family:var(--cond);font-size:13px;margin:0 0 6px;font-weight:600}
+.seg{display:none;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{background:var(--surface);border:0;padding:5px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+@media (max-width:1100px){
+  .chain{grid-template-columns:minmax(0,1fr)}
+  .chain.show-call .side.put,.chain.show-put .side.call{display:none}
+  .seg{display:inline-flex}
+}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:22px}
+@media (max-width:900px){.two{grid-template-columns:minmax(0,1fr)}}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px;margin:0}
+.kv div{min-width:0}
+.kv dt{font-size:11.5px;color:var(--muted)}
+.kv dd{margin:0;font-family:var(--mono);font-size:15px;font-weight:500}
+.kv dd small{display:block;font-size:11px;font-weight:400;color:var(--muted)}
+.ctitle{font-family:var(--cond);font-size:16px;font-weight:600;margin:0 0 10px}
+.note{font-size:12.5px;color:var(--muted);margin:10px 0 0}
+.note.warn{color:var(--warn)}
+.empty{color:var(--muted);padding:14px 4px;margin:0}
+details{border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font-family:var(--cond);font-weight:600}
+details .doc{max-width:68ch;color:var(--muted)}
+details .doc h3{color:var(--ink);font-size:13px;margin:14px 0 4px}
+details .doc ul{margin:4px 0;padding-left:18px}
+@media (prefers-reduced-motion:no-preference){.loading{animation:pulse 1.4s ease-in-out infinite}}
+@keyframes pulse{50%{opacity:.5}}
+</style>
+
+<div class="top"><div class="wrap">
+  <h1>Single-Leg Options Desk</h1>
+  <span class="sp"></span>
+  <span class="clock" id="clock">–</span>
+  <span class="exit" id="exit">3:45 PM ET exit –</span>
+  <button class="btn" id="refresh" type="button">Refresh</button>
+</div></div>
+
+<main class="wrap">
+  <div class="banner" id="banner" hidden></div>
+
+  <section id="p-under">
+    <div class="head"><h2>1 · Pick a ticker</h2><span class="muted" style="font-size:12px">Read-only: this page cannot preview or place orders.</span></div>
+    <p class="pickline" id="pickline">Ranking the six by at-the-money option volume and spread…</p>
+    <div class="tiles" id="tiles"></div>
+    <p class="src" id="src-under">Price and day change: Robinhood Trading · get_equity_quotes. VWAP and RSI: RH TV HFT (TradingView) · mcp-tv-get-symbol-data-batch. Liquidity rank: the at-the-money call and put on the two nearest expirations from get_option_quotes; rank adds the volume rank and the spread rank, and a ticker with earnings inside three sessions cannot be top pick.</p>
+    <p class="err" id="err-under" hidden></p>
+  </section>
+
+  <section id="p-levels">
+    <div class="head"><h2>2 · Dealer levels</h2>
+      <div class="ctl"><button class="btn ghost" id="recompute" type="button">Recompute levels</button></div></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Ticker</th><th>Spot at compute</th><th>Gamma flip</th><th>Flip vs spot</th><th>Call wall</th><th>Put wall</th><th>Regime</th><th>Map</th><th>Contracts</th><th>Computed (ET)</th></tr></thead>
+      <tbody id="lvl-body"></tbody></table></div>
+    <div class="bar" id="bar" aria-hidden="true"></div>
+    <p class="src">Computed once per day in your browser from the live Robinhood chain (get_option_chains → get_option_instruments → get_option_quotes) with the gex-vex-heatseeker method: expirations 0–7 days out plus the next two Fridays, strikes within ±3% of spot, calls +gamma and puts −gamma, flip found by re-deriving Black-Scholes gamma across ±6% of spot. "Map" compares the open-interest map with one that adds 30% of today's volume; under 0.15% flip drift is stable.</p>
+    <p class="err" id="err-levels" hidden></p>
+  </section>
+
+  <section id="p-picker">
+    <div class="head"><h2>3 · Pick a contract · <span id="pk-sym">SPY</span></h2>
+      <div class="ctl">
+        <label for="exp" class="muted">Expiration</label>
+        <select id="exp"></select>
+        <span class="seg" role="group" aria-label="Side"><button type="button" id="seg-call" aria-pressed="true">Calls</button><button type="button" id="seg-put" aria-pressed="false">Puts</button></span>
+      </div></div>
+    <div class="chain show-call" id="chain">
+      <div class="side call"><h3>Calls</h3><div class="scroll"><table><thead id="th-call"></thead><tbody id="tb-call"></tbody></table></div></div>
+      <div class="side put"><h3>Puts</h3><div class="scroll"><table><thead id="th-put"></thead><tbody id="tb-put"></tbody></table></div></div>
+    </div>
+    <p class="src" id="src-picker">Robinhood Trading · get_option_instruments, get_option_quotes. Seven strikes each side of spot. Spread % = (ask − bid) ÷ mid; over 10% is flagged wide. "Target" marks the strike nearest 0.50–0.55 delta with a spread of 10% or less.</p>
+    <p class="err" id="err-picker" hidden></p>
+  </section>
+
+  <div class="two">
+    <section id="p-plan">
+      <div class="head"><h2>4 · Trade plan</h2></div>
+      <div class="panel" id="plan"><p class="empty">Pick a strike in the contract picker.</p></div>
+      <p class="src" id="src-plan">Entry is the live ask from get_option_quotes. Account value: Robinhood Trading · get_portfolio.</p>
+    </section>
+    <section id="p-pos">
+      <div class="head"><h2>Open positions</h2>
+        <div class="ctl"><label for="acct" class="muted">Account</label><select id="acct"><option value="">Loading…</option></select></div></div>
+      <div id="pos"><p class="empty">Loading positions…</p></div>
+      <p class="src" id="src-pos">Robinhood Trading · get_option_positions, get_option_instruments, get_option_quotes. Stop is 10% under average cost.</p>
+      <p class="err" id="err-pos" hidden></p>
+    </section>
+  </div>
+
+  <section id="p-events">
+    <div class="head"><h2>Events</h2></div>
+    <div class="two">
+      <div><div class="scroll"><table><thead><tr><th>Ticker</th><th>Next earnings</th><th>Days away</th><th>EPS est.</th><th>Last report</th></tr></thead><tbody id="earn"></tbody></table></div>
+        <p class="src" id="src-earn">FMP · calendar (earnings-company). SPY and QQQ are funds and report no earnings.</p>
+        <p class="err" id="err-earn" hidden></p></div>
+      <div><div class="scroll"><table><thead><tr><th>Time (ET)</th><th>High-impact US release today</th><th>Actual</th><th>Forecast</th><th>Previous</th></tr></thead><tbody id="econ"></tbody></table></div>
+        <p class="src" id="src-econ">RH TV HFT (TradingView) · mcp-tv-get-economic-calendar, US, high importance only.</p>
+        <p class="err" id="err-econ" hidden></p></div>
+    </div>
+  </section>
+
+  <details id="readme">
+    <summary>README: refreshing and what is not covered</summary>
+    <div class="doc">
+      <h3>Refresh</h3>
+      <ul>
+        <li>Prices, VWAP and RSI update on their own about every 30 seconds while the page is visible. Contract quotes, account value and positions update on the same beat.</li>
+        <li>Refresh re-pulls every panel at once. Each panel shows the time of its last successful pull.</li>
+        <li>The liquidity rank and top pick refresh every two minutes and on Refresh. The page opens on the top pick until you tap a ticker yourself.</li>
+        <li>Dealer levels are computed once per trading day and kept in this browser. Recompute levels rebuilds them from the chain as it stands now; the first build of the day takes up to a minute because SPY and QQQ carry several hundred contracts.</li>
+        <li>Earnings dates and the economic calendar load once per page open.</li>
+        <li>Choose your account once in Open positions. The page remembers it in this browser; no account number is stored in the page itself.</li>
+      </ul>
+      <h3>Not covered</h3>
+      <ul>
+        <li>Orders. The page can only read; it holds no tool that previews, places, cancels or exercises anything.</li>
+        <li>Spreads, short options and assigned stock. Sizing and stops assume one long call or one long put.</li>
+        <li>Market holidays and half days. The 3:45 PM ET countdown runs on the clock alone.</li>
+        <li>Intraday rebuilds of the dealer map, air pockets, vanna and charm tables, and the heatseeker entry gates. Open interest is published a day late, so levels describe yesterday's board adjusted only by the stability check.</li>
+        <li>Dividends, early exercise and fees in break-even. Break-even is strike plus or minus the ask.</li>
+        <li>Direction. The top pick is the most liquid ticker, not a call-or-put signal.</li>
+        <li>Slippage. Stops and scale-outs are premium levels, not resting orders.</li>
+        <li>Tickers other than SPY, QQQ, NVDA, TSLA, AMD and META.</li>
+      </ul>
+    </div>
+  </details>
+</main>
+
+<script id="gexlib">
+/* Port of gex-vex-heatseeker/scripts/gex_map.py (build, per_strike, find_flip, analyze, --compare-flow). */
+var GEX = (function () {
+  var SQRT_2PI = Math.sqrt(2 * Math.PI), MIN_T = 1 / (365 * 24 * 4);
+  function pdf(x) { return Math.exp(-0.5 * x * x) / SQRT_2PI; }
+  function d12(S, K, T, s, r) {
+    if (S <= 0 || K <= 0 || T <= 0 || s <= 0) return null;
+    var v = s * Math.sqrt(T), d1 = (Math.log(S / K) + (r + 0.5 * s * s) * T) / v;
+    return [d1, d1 - v];
+  }
+  function gamma(S, K, T, s, r) { var d = d12(S, K, T, s, r); return d ? pdf(d[0]) / (S * s * Math.sqrt(T)) : 0; }
+  function vanna(S, K, T, s, r) { var d = d12(S, K, T, s, r); return d ? -pdf(d[0]) * d[1] / s : 0; }
+  function years(expiry, asofMs) {
+    var p = expiry.split("-").map(Number), exp = Date.UTC(p[0], p[1] - 1, p[2], 20, 0, 0);
+    return Math.max((exp - asofMs) / (365 * 24 * 3600 * 1000), MIN_T);
+  }
+  function build(chain, flow) {
+    var asof = Date.parse(chain.asof), out = [];
+    chain.contracts.forEach(function (c) {
+      var iv = +c.iv || 0; if (iv <= 0) return;
+      var oi = +c.oi || 0; if (flow) oi += 0.30 * (+c.volume || 0);
+      out.push({ K: +c.strike, type: String(c.type).toLowerCase(), T: years(c.expiry, asof), iv: iv, oi: oi, gamma: c.gamma == null ? null : +c.gamma });
+    });
+    return out;
+  }
+  function netAt(x, cs, r) {
+    var t = 0;
+    for (var i = 0; i < cs.length; i++) { var c = cs[i]; t += (c.type === "call" ? 1 : -1) * gamma(x, c.K, c.T, c.iv, r) * c.oi * 100 * x * x * 0.01; }
+    return t;
+  }
+  function analyze(chain, flow) {
+    var spot = +chain.spot, r = chain.risk_free_rate == null ? 0.04 : +chain.risk_free_rate, cs = build(chain, flow);
+    if (!cs.length) return null;
+    var gex = new Map(), vex = new Map();
+    cs.forEach(function (c) {
+      var sign = c.type === "call" ? 1 : -1, g = c.gamma != null ? c.gamma : gamma(spot, c.K, c.T, c.iv, r);
+      gex.set(c.K, (gex.get(c.K) || 0) + sign * g * c.oi * 100 * spot * spot * 0.01);
+      vex.set(c.K, (vex.get(c.K) || 0) + sign * vanna(spot, c.K, c.T, c.iv, r) * c.oi * 100 * spot * 0.01);
+    });
+    var net = 0, netVex = 0; gex.forEach(function (v) { net += v; }); vex.forEach(function (v) { netVex += v; });
+    var span = 0.06, steps = 241, lo = spot * (1 - span), hi = spot * (1 + span), step = (hi - lo) / (steps - 1), flips = [], px = null, py = null;
+    for (var i = 0; i < steps; i++) {
+      var x = lo + i * step, y = netAt(x, cs, r);
+      if (py !== null && py !== y && (py < 0) !== (y < 0)) flips.push(px + (x - px) * (-py) / (y - py));
+      px = x; py = y;
+    }
+    var nearest = null; flips.forEach(function (f) { if (nearest === null || Math.abs(f - spot) < Math.abs(nearest - spot)) nearest = f; });
+    var king = null, kingV = -1, cw = null, cwV = 0, pw = null, pwV = 0;
+    gex.forEach(function (v, k) {
+      if (Math.abs(v) > kingV) { kingV = Math.abs(v); king = k; }
+      if (k > spot && v > 0 && v > cwV) { cwV = v; cw = k; }
+      if (k < spot && v < 0 && v < pwV) { pwV = v; pw = k; }
+    });
+    var rd = function (n) { return Math.round(n * 100) / 100; };
+    return { spot: spot, net_gex: net, net_vex: netVex, regime: net > 0 ? "positive" : "negative",
+      vanna_alignment: (net > 0) === (netVex > 0) ? "aligned" : "divergent",
+      flip_levels: flips.map(rd), nearest_flip: nearest ? rd(nearest) : null,
+      flip_distance_pct: nearest ? rd((nearest - spot) / spot * 100) : null,
+      king_node: king, call_wall: cw, put_wall: pw, contracts: cs.length };
+  }
+  function compare(chain) {
+    var plain = analyze(chain, false), flow = analyze(chain, true);
+    if (!plain) return null;
+    var pf = plain.nearest_flip, ff = flow && flow.nearest_flip, drift = null, verdict = "unknown";
+    if (pf && ff) { drift = Math.abs(ff - pf) / plain.spot * 100; verdict = drift < 0.15 ? "stable" : "contested"; }
+    plain.flow_flip = ff || null; plain.drift_pct = drift; plain.confidence = verdict;
+    return plain;
+  }
+  return { analyze: analyze, compare: compare };
+})();
+if (typeof module !== "undefined") module.exports = GEX;
+</script>
+
+<script>
+(function () {
+  var RH = "Robinhood Trading", TV = "RH TV HFT", FMP = "FMP";
+  var TICKERS = [
+    { s: "SPY", tv: "AMEX:SPY", etf: true }, { s: "QQQ", tv: "NASDAQ:QQQ", etf: true },
+    { s: "NVDA", tv: "NASDAQ:NVDA" }, { s: "TSLA", tv: "NASDAQ:TSLA" },
+    { s: "AMD", tv: "NASDAQ:AMD" }, { s: "META", tv: "NASDAQ:META" }];
+  var SYMS = TICKERS.map(function (t) { return t.s; });
+  var WIDE = 10, STOP = 0.10, CAP = 0.05, WINDOW = 7;
+  var S = { mcp: null, sym: "SPY", quotes: {}, tv: {}, levels: {}, lvlStatus: {}, exps: [], exp: null, rows: [], pq: {}, side: "call",
+            sel: null, accounts: [], account: null, portfolio: null, positions: null, posIns: {}, posQ: {}, earn: {}, econ: null, tok: 0, stamp: {}, liq: {}, pick: null, userPicked: false };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var num = function (v) { var n = parseFloat(v); return isFinite(n) ? n : null; };
+  var f = function (n, d) { d = d == null ? 2 : d; return n == null ? "—" : n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }); };
+  var usd = function (n, d) { return n == null ? "—" : (n < 0 ? "−$" : "$") + f(Math.abs(n), d); };
+  var pct = function (n, d) { return n == null ? "—" : (n > 0 ? "+" : n < 0 ? "−" : "") + f(Math.abs(n), d) + "%"; };
+  var big = function (n) { return n == null ? "—" : n >= 1e6 ? f(n / 1e6, 2) + "M" : n >= 1e4 ? f(n / 1e3, 0) + "K" : n >= 1e3 ? f(n / 1e3, 1) + "K" : String(n); };
+  var cls = function (n) { return n == null || n === 0 ? "" : n > 0 ? "up" : "down"; };
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var store = { get: function (k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+                set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+
+  /* ---------- Eastern time ---------- */
+  var etFmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, weekday: "short" });
+  function et(d) { var o = {}; etFmt.formatToParts(d || new Date()).forEach(function (p) { o[p.type] = p.value; }); if (o.hour === "24") o.hour = "00"; o.date = o.year + "-" + o.month + "-" + o.day; return o; }
+  function etTime(ms, secs) { return new Date(ms).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", second: secs === false ? undefined : "2-digit" }); }
+  function dayNum(s) { var p = s.split("-").map(Number); return Date.UTC(p[0], p[1] - 1, p[2]) / 864e5; }
+  function dte(exp) { return dayNum(exp) - dayNum(et().date); }
+  function sessionsTo(date) { var n = 0, a = dayNum(et().date), b = dayNum(date); for (var x = a + 1; x <= b; x++) { var wd = new Date(x * 864e5).getUTCDay(); if (wd !== 0 && wd !== 6) n++; } return n; }
+  function exitText() {
+    var o = et(), secs = (+o.hour) * 3600 + (+o.minute) * 60 + (+o.second), left = 15 * 3600 + 45 * 60 - secs;
+    if (o.weekday === "Sat" || o.weekday === "Sun") return { t: "market closed (weekend)", soon: false, left: null };
+    if (left <= 0) return { t: "exit time passed", soon: true, left: 0 };
+    var h = Math.floor(left / 3600), m = Math.floor(left % 3600 / 60), s = left % 60;
+    return { t: (h ? h + "h " : "") + (h || m ? String(m).padStart(h ? 2 : 1, "0") + "m " : "") + String(s).padStart(2, "0") + "s", soon: left <= 1800, left: left };
+  }
+  function tick() {
+    var o = et(), x = exitText();
+    $("clock").textContent = o.weekday + " " + etTime(Date.now()) + " ET";
+    $("exit").textContent = "3:45 PM ET exit · " + x.t; $("exit").className = "exit" + (x.soon ? " soon" : "");
+    var e = $("pos-exit"); if (e) e.textContent = x.t;
+  }
+
+  /* ---------- connector plumbing ---------- */
+  var active = 0, queue = [];
+  function limit(fn) { return new Promise(function (res, rej) { var run = function () { active++; fn().then(res, rej).finally(function () { active--; if (queue.length) queue.shift()(); }); }; active < 5 ? run() : queue.push(run); }); }
+  function call(server, tool, input, opts) {
+    return limit(function () {
+      return S.mcp.callTool(server, tool, input, opts).catch(function (e) {
+        if (!e || !e.retryable) throw e;
+        return sleep(Math.min(e.retryAfterMs || (700 + Math.random() * 900), 8000)).then(function () { return S.mcp.callTool(server, tool, input, opts); });
+      });
+    });
+  }
+  function body(r) { var p = r && r.payload; if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) {} } return (p && typeof p === "object" && !Array.isArray(p) && "data" in p) ? p.data : p; }
+  function when(r) { return (r && r.cache && r.cache.storedAt) || Date.now(); }
+  var DENIED = { needs_reauth: 1, server_not_connected: 1, selection_required: 1, blocked_by_policy: 1, approval_required: 1, not_in_manifest: 1, consent_required: 1, not_granted: 1 };
+  function explain(e, server) {
+    switch (e && e.code) {
+      case "needs_reauth": return "Reconnect " + server + " in claude.ai Settings → Connectors.";
+      case "server_not_connected": case "selection_required": case "server_not_found": return "Add or choose " + server + " in claude.ai Settings → Connectors.";
+      case "not_in_manifest": case "consent_required": return server + " is not allowed for this page. Turn it on in the page's Permissions menu, then press Refresh.";
+      case "blocked_by_policy": return "Your organization blocks this " + server + " tool.";
+      case "approval_required": return server + " needs your approval. Press Refresh and allow it.";
+      case "tool_error": return server + " reported an error: " + (e.message || "no detail");
+      case "server_unavailable": case "rate_limited": return server + " is not answering right now. Showing the last good data; press Refresh to try again.";
+      case "not_granted": case "capability_disabled": case "capability_removed": return "Connector access is off in this view.";
+      default: return server + " call failed (" + ((e && e.code) || "unknown") + "). Press Refresh to try again.";
+    }
+  }
+  function showErr(id, msg) { var el = $(id); if (!el) return; el.hidden = !msg; el.textContent = msg || ""; }
+  function stamp(id, base, ms) { $(id).textContent = base + " Last pull " + etTime(ms) + " ET."; }
+
+  /* ---------- 1 underlying ---------- */
+  function last(sym) { var q = S.quotes[sym]; return q ? num(q.last_trade_price) : null; }
+  function renderUnder() {
+    $("tiles").innerHTML = TICKERS.map(function (t) {
+      var q = S.quotes[t.s], v = S.tv[t.tv] || {}, px = q ? num(q.last_trade_price) : null, pc = q ? num(q.adjusted_previous_close) : null;
+      var ch = px != null && pc ? px - pc : null, chp = ch != null ? ch / pc * 100 : null, vw = num(v.VWAP), rsi = num(v.RSI), r5 = num(v["RSI|5"]);
+      var L = S.liq[t.s]; var side = px != null && vw != null ? (px >= vw ? '<span class="chip pos">above VWAP</span>' : '<span class="chip neg">below VWAP</span>') : "";
+      return '<button type="button" class="tile" data-sym="' + t.s + '" aria-pressed="' + (S.sym === t.s) + '">' +
+        '<span class="sym"><span>' + t.s + "</span>" + side + "</span>" +
+        '<span class="px">' + f(px) + "</span>" +
+        '<span class="chg ' + cls(ch) + '">' + (ch == null ? "—" : (ch > 0 ? "+" : ch < 0 ? "−" : "") + f(Math.abs(ch))) + " · " + pct(chp) + "</span>" +
+        "<dl><dt>VWAP</dt><dd>" + f(vw) + "</dd><dt>RSI 14 daily</dt><dd>" + f(rsi, 1) + "</dd><dt>RSI 14 5-min</dt><dd>" + f(r5, 1) + "</dd><dt>ATM option vol.</dt><dd>" + (L ? big(L.vol) : "—") + "</dd><dt>ATM spread</dt><dd>" + (L && L.spread != null ? f(L.spread, 1) + "%" : "—") + "</dd></dl>" +
+        '<span class="liq">' + (L && L.rank ? '<span class="chip">#' + L.rank + " liquidity</span>" : "") + (S.pick === t.s ? '<span class="chip top">Top pick</span>' : "") + (L && L.earn ? '<span class="chip warn">earnings soon</span>' : "") + "</span></button>";
+    }).join("");
+  }
+  var underBase = $("src-under").textContent;
+  function watchUnder() {
+    S.mcp.watchTool(RH, "get_equity_quotes", { symbols: SYMS }, function (ev) {
+      if (ev.type === "data") {
+        ((body(ev.result) || {}).results || []).forEach(function (r) { if (r && r.quote) S.quotes[r.quote.symbol] = r.quote; });
+        S.stamp.rh = when(ev.result); showErr("err-under", ""); afterUnder();
+      } else { if (DENIED[ev.error.code]) S.quotes = {}; showErr("err-under", explain(ev.error, RH)); afterUnder(); }
+    }, { refetchInterval: 30000 });
+    S.mcp.watchTool(TV, "mcp-tv-get-symbol-data-batch", { symbols: TICKERS.map(function (t) { return t.tv; }), columns: ["close", "RSI", "RSI|5", "VWAP"] }, function (ev) {
+      if (ev.type === "data") { S.tv = (body(ev.result) || {}); S.stamp.tv = when(ev.result); afterUnder(); }
+      else { if (DENIED[ev.error.code]) S.tv = {}; showErr("err-under", explain(ev.error, TV)); afterUnder(); }
+    }, { refetchInterval: 30000 });
+  }
+  function afterUnder() {
+    renderUnder(); renderPlan(); renderBar();
+    $("src-under").textContent = underBase + (S.stamp.rh ? " Robinhood pull " + etTime(S.stamp.rh) + " ET." : "") + (S.stamp.tv ? " TradingView pull " + etTime(S.stamp.tv) + " ET." : "");
+  }
+
+  /* ---------- liquidity rank ---------- */
+  function scanOne(sym) {
+    return Promise.all([last(sym) != null ? last(sym) : freshSpot(sym), getChain(sym)]).then(function (a) {
+      var spot = a[0], exps = (a[1].expiration_dates || []).filter(function (d) { return dte(d) >= 0; }).sort().slice(0, 2), cands = [];
+      if (!exps.length) throw { code: "tool_error", message: "no live expirations for " + sym };
+      [1, 2.5, 5].forEach(function (g) { var k = Math.round(spot / g) * g; if (cands.indexOf(k) < 0) cands.push(k); });
+      return Promise.all(cands.map(function (k) {
+        return call(RH, "get_option_instruments", { chain_symbol: sym, expiration_dates: exps.join(","), strike_price: k.toFixed(4) }, { cache: { staleTime: 21600000, gcTime: 43200000 } })
+          .then(function (r) { return ((body(r) || {}).instruments || []).filter(function (i) { return i.state === "active"; }); }, function () { return []; });
+      })).then(function (lists) {
+        var best = null;
+        lists.forEach(function (l, i) { if (l.length && (best === null || l.length > lists[best].length || (l.length === lists[best].length && Math.abs(cands[i] - spot) < Math.abs(cands[best] - spot)))) best = i; });
+        if (best === null) throw { code: "tool_error", message: "no at-the-money strike found for " + sym };
+        var ins = lists[best];
+        return getQuotes(ins.map(function (i) { return i.id; })).then(function (q) {
+          var vol = 0, oi = 0, sp = [], n = 0;
+          ins.forEach(function (i) { var x = q[i.id]; if (!x) return; n++; vol += +x.volume || 0; oi += +x.open_interest || 0; var s = spreadPct(x); if (s != null) sp.push(s); });
+          if (!n) throw { code: "server_unavailable", message: "no quotes for " + sym };
+          S.liq[sym] = { strike: cands[best], exps: exps, vol: vol, oi: oi, n: n, spread: sp.length ? sp.reduce(function (x, y) { return x + y; }, 0) / sp.length : null, asof: Date.now() };
+        });
+      });
+    }).catch(function (e) { delete S.liq[sym]; showErr("err-under", sym + " liquidity: " + explain(e, RH)); });
+  }
+  function rankLiq() {
+    var syms = SYMS.filter(function (s) { return S.liq[s]; });
+    var byVol = syms.slice().sort(function (a, b) { return S.liq[b].vol - S.liq[a].vol; });
+    var bySp = syms.slice().sort(function (a, b) { var x = S.liq[a].spread, y = S.liq[b].spread; return (x == null ? 1e9 : x) - (y == null ? 1e9 : y); });
+    syms.forEach(function (s) { var e = S.earn[s] && S.earn[s].next; S.liq[s].score = byVol.indexOf(s) + bySp.indexOf(s); S.liq[s].earn = !!(e && sessionsTo(e.date) <= 3); });
+    syms.sort(function (a, b) { return S.liq[a].score - S.liq[b].score || S.liq[b].vol - S.liq[a].vol; });
+    syms.forEach(function (s, i) { S.liq[s].rank = i + 1; });
+    S.pick = syms.filter(function (s) { return !S.liq[s].earn; })[0] || null;
+    var L = S.pick && S.liq[S.pick];
+    $("pickline").innerHTML = !syms.length ? "Liquidity rank is unavailable right now." :
+      !L ? "No top pick: every ranked ticker has earnings inside three sessions." :
+      "Top pick now: <b>" + esc(S.pick) + "</b>. Its at-the-money options (" + f(L.strike, L.strike % 1 ? 1 : 0) + " strike, " + esc(L.exps.join(" and ")) + ") have traded <span class=\"num\">" + big(L.vol) + "</span> contracts today at an average <span class=\"num\">" + (L.spread == null ? "—" : f(L.spread, 1) + "%") + "</span> spread" + (syms.length < SYMS.length ? ", best of the " + syms.length + " ranked so far." : ", the best mix of the six.") + " Checked " + etTime(L.asof) + " ET.";
+    renderUnder();
+    if (S.pick && !S.userPicked && S.pick !== S.sym) { S.sym = S.pick; S.exp = null; renderUnder(); renderLevels(); loadChain(); }
+  }
+  function scanAll() { return Promise.all(SYMS.map(scanOne)).then(rankLiq); }
+
+  /* ---------- chain helpers ---------- */
+  function getChain(sym) {
+    return call(RH, "get_option_chains", { underlying_symbol: sym }, { cache: { staleTime: 3600000, gcTime: 7200000 } }).then(function (r) {
+      var cs = ((body(r) || {}).chains || []).filter(function (c) { return c.symbol === sym; });
+      cs.sort(function (a, b) { return (b.expiration_dates || []).length - (a.expiration_dates || []).length; });
+      if (!cs.length) throw { code: "tool_error", message: "no option chain returned for " + sym };
+      return cs[0];
+    });
+  }
+  function getInstruments(sym, exp) {
+    var all = [], pages = 0;
+    function page(cursor) {
+      var input = { chain_symbol: sym, expiration_dates: exp }; if (cursor) input.cursor = cursor;
+      return call(RH, "get_option_instruments", input, { cache: { staleTime: 21600000, gcTime: 43200000 } }).then(function (r) {
+        var d = body(r) || {}; all = all.concat(d.instruments || []);
+        return d.next && ++pages < 40 ? page(d.next) : all;
+      });
+    }
+    return page(null);
+  }
+  function getQuotes(ids, onProgress) {
+    var chunks = [], out = {}, done = 0;
+    for (var i = 0; i < ids.length; i += 20) chunks.push(ids.slice(i, i + 20));
+    return Promise.all(chunks.map(function (c) {
+      return call(RH, "get_option_quotes", { instrument_ids: c }, { cache: false }).then(function (r) {
+        ((body(r) || {}).results || []).forEach(function (x) { if (x && x.quote) out[x.quote.instrument_id] = x.quote; });
+        done += c.length; if (onProgress) onProgress(done, ids.length);
+      });
+    })).then(function () { return out; });
+  }
+  function freshSpot(sym) {
+    return call(RH, "get_equity_quotes", { symbols: [sym] }, { cache: false }).then(function (r) {
+      var q = (((body(r) || {}).results || [])[0] || {}).quote; var p = q && num(q.last_trade_price);
+      if (p == null) throw { code: "tool_error", message: "no price returned for " + sym }; return p;
+    });
+  }
+
+  /* ---------- 2 dealer levels ---------- */
+  function lvlKey(sym) { return "osd:levels:" + sym + ":" + et().date; }
+  function gexExpirations(dates) {
+    var live = dates.filter(function (d) { return dte(d) >= 0; }).sort(), pick = live.filter(function (d) { return dte(d) <= 7; });
+    live.filter(function (d) { return new Date(d + "T12:00:00Z").getUTCDay() === 5; }).slice(0, 2).forEach(function (d) { if (pick.indexOf(d) < 0) pick.push(d); });
+    return pick.sort();
+  }
+  function computeLevels(sym, force) {
+    var cached = !force && store.get(lvlKey(sym));
+    if (cached) { S.levels[sym] = cached; S.lvlStatus[sym] = null; renderLevels(); return Promise.resolve(); }
+    S.lvlStatus[sym] = "reading chain…"; renderLevels();
+    var spot, exps;
+    return Promise.all([freshSpot(sym), getChain(sym)]).then(function (a) {
+      spot = a[0]; exps = gexExpirations(a[1].expiration_dates || []);
+      return Promise.all(exps.map(function (e) { return getInstruments(sym, e); }));
+    }).then(function (lists) {
+      var ins = [].concat.apply([], lists).filter(function (i) { var k = num(i.strike_price); return i.state === "active" && k >= spot * 0.97 && k <= spot * 1.03; });
+      if (!ins.length) throw { code: "tool_error", message: "no contracts within ±3% of spot for " + sym };
+      return getQuotes(ins.map(function (i) { return i.id; }), function (d, n) { S.lvlStatus[sym] = "quotes " + d + " / " + n; renderLevels(); }).then(function (q) {
+        var missing = ins.filter(function (i) { return !q[i.id]; }).length;
+        if (missing > ins.length * 0.02) throw { code: "server_unavailable", message: missing + " quotes missing" };
+        var asof = Date.now(), contracts = ins.filter(function (i) { return q[i.id]; }).map(function (i) {
+          var x = q[i.id];
+          return { strike: num(i.strike_price), type: i.type, expiry: i.expiration_date, oi: x.open_interest, volume: x.volume, iv: num(x.implied_volatility), gamma: num(x.gamma) };
+        });
+        var m = GEX.compare({ symbol: sym, spot: spot, asof: new Date(asof).toISOString(), contracts: contracts });
+        if (!m) throw { code: "tool_error", message: "no contract carried an implied volatility" };
+        m.asof = asof; m.expirations = exps;
+        S.levels[sym] = m; S.lvlStatus[sym] = null; store.set(lvlKey(sym), m); renderLevels();
+      });
+    }).catch(function (e) { S.lvlStatus[sym] = "failed"; showErr("err-levels", sym + ": " + explain(e, RH)); renderLevels(); });
+  }
+  function allLevels(force) {
+    showErr("err-levels", "");
+    var order = [S.sym].concat(SYMS.filter(function (s) { return s !== S.sym; }));
+    order.forEach(function (s) { if (force || !store.get(lvlKey(s))) S.lvlStatus[s] = "queued"; });
+    renderLevels();
+    return order.reduce(function (p, s) { return p.then(function () { return computeLevels(s, force); }); }, Promise.resolve());
+  }
+  function renderLevels() {
+    $("lvl-body").innerHTML = SYMS.map(function (s) {
+      var m = S.levels[s], st = S.lvlStatus[s];
+      if (!m) return '<tr><td class="t"><b>' + s + '</b></td><td colspan="9" class="t muted' + (st && st !== "failed" ? " loading" : "") + '">' + esc(st || (S.mcp ? "waiting" : "needs live connectors")) + "</td></tr>";
+      var conf = m.confidence === "stable" ? '<span class="chip pos">stable</span>' : m.confidence === "contested" ? '<span class="chip warn">contested</span>' : '<span class="chip">n/a</span>';
+      return '<tr class="' + (s === S.sym ? "sel" : "") + '"><td class="t"><b>' + s + "</b>" + (st ? ' <span class="muted loading">' + esc(st) + "</span>" : "") + "</td><td>" + f(m.spot) + "</td><td>" +
+        (m.nearest_flip == null ? '<span class="muted">none within ±6%</span>' : f(m.nearest_flip)) + '</td><td class="' + cls(m.flip_distance_pct) + '">' + pct(m.flip_distance_pct) + "</td><td>" +
+        (m.call_wall == null ? "—" : f(m.call_wall, m.call_wall % 1 ? 1 : 0)) + "</td><td>" + (m.put_wall == null ? "—" : f(m.put_wall, m.put_wall % 1 ? 1 : 0)) + '</td><td class="t">' +
+        (m.regime === "positive" ? '<span class="chip pos">+GEX damped</span>' : '<span class="chip neg">−GEX amplified</span>') + '</td><td class="t">' + conf +
+        (m.drift_pct != null ? ' <span class="muted num">' + f(m.drift_pct) + "%</span>" : "") + "</td><td>" + m.contracts + "</td><td>" + etTime(m.asof, false) + "</td></tr>";
+    }).join("");
+    renderBar();
+  }
+  function renderBar() {
+    var m = S.levels[S.sym], bar = $("bar"), px = last(S.sym);
+    if (!m) { bar.innerHTML = ""; bar.style.display = "none"; return; }
+    bar.style.display = "";
+    var pts = [["pw", "Put wall", m.put_wall, "hi"], ["fl", "Flip", m.nearest_flip, "lo"], ["cw", "Call wall", m.call_wall, "hi"], ["spot", S.sym + " now", px != null ? px : m.spot, "lo"]].filter(function (p) { return p[2] != null; });
+    var lo = Math.min.apply(null, pts.map(function (p) { return p[2]; })), hi = Math.max.apply(null, pts.map(function (p) { return p[2]; })), pad = (hi - lo) * 0.12 || 1;
+    lo -= pad; hi += pad;
+    bar.innerHTML = '<div class="axis"></div>' + pts.map(function (p) {
+      return '<div class="mk ' + p[0] + " " + p[3] + '" style="left:' + ((p[2] - lo) / (hi - lo) * 100).toFixed(2) + '%"><b>' + esc(p[1]) + "</b>" + f(p[2]) + "</div>";
+    }).join("");
+  }
+
+  /* ---------- 3 contract picker ---------- */
+  var COLS = "<tr><th>Strike</th><th>Bid</th><th>Ask</th><th>Spread %</th><th>Delta</th><th>Theta</th><th>IV</th><th>Volume</th><th>Open int.</th></tr>";
+  $("th-call").innerHTML = COLS; $("th-put").innerHTML = COLS;
+  var pickBase = $("src-picker").textContent;
+  function spreadPct(q) { var b = num(q.bid_price), a = num(q.ask_price); if (b == null || a == null || a + b <= 0) return null; return (a - b) / ((a + b) / 2) * 100; }
+  function loadChain() {
+    var sym = S.sym, tok = ++S.tok;
+    $("pk-sym").textContent = sym; S.rows = []; S.pq = {}; S.sel = null; renderPicker("Loading " + sym + " chain…"); renderPlan(); showErr("err-picker", "");
+    return getChain(sym).then(function (ch) {
+      if (tok !== S.tok) return;
+      S.exps = (ch.expiration_dates || []).filter(function (d) { return dte(d) >= 0; }).sort();
+      if (S.exps.indexOf(S.exp) < 0) S.exp = (S.exps[1] && dte(S.exps[0]) === 0 && +et().hour >= 13 ? S.exps[1] : S.exps[0]) || null;
+      $("exp").innerHTML = S.exps.map(function (d) { var n = dte(d); return '<option value="' + d + '"' + (d === S.exp ? " selected" : "") + ">" + d + " · " + n + " DTE</option>"; }).join("");
+      return loadStrikes(tok);
+    }).catch(function (e) { if (tok === S.tok) { renderPicker(""); showErr("err-picker", explain(e, RH)); } });
+  }
+  function loadStrikes(tok) {
+    var sym = S.sym, exp = S.exp; if (!exp) { renderPicker("No live expirations returned."); return Promise.resolve(); }
+    renderPicker("Loading " + sym + " " + exp + " strikes…");
+    return Promise.all([getInstruments(sym, exp), last(sym) != null ? last(sym) : freshSpot(sym)]).then(function (a) {
+      if (tok !== S.tok || exp !== S.exp) return;
+      var ins = a[0].filter(function (i) { return i.state === "active"; }), spot = a[1];
+      var ks = Array.from(new Set(ins.map(function (i) { return num(i.strike_price); }))).sort(function (x, y) { return x - y; });
+      var at = 0; ks.forEach(function (k, i) { if (Math.abs(k - spot) < Math.abs(ks[at] - spot)) at = i; });
+      var keep = new Set(ks.slice(Math.max(0, at - WINDOW), at + WINDOW + 1)); S.atm = ks[at];
+      S.rows = ins.filter(function (i) { return keep.has(num(i.strike_price)); }).sort(function (x, y) { return num(x.strike_price) - num(y.strike_price); });
+      return refreshPicker();
+    }).catch(function (e) { if (tok === S.tok) { renderPicker(""); showErr("err-picker", explain(e, RH)); } });
+  }
+  function refreshPicker() {
+    if (!S.rows.length) return Promise.resolve();
+    var tok = S.tok;
+    return getQuotes(S.rows.map(function (i) { return i.id; })).then(function (q) {
+      if (tok !== S.tok) return; S.pq = q; showErr("err-picker", ""); stamp("src-picker", pickBase, Date.now()); renderPicker(); renderPlan();
+    }).catch(function (e) { if (tok !== S.tok) return; if (DENIED[e && e.code]) S.pq = {}; showErr("err-picker", explain(e, RH)); renderPicker(); });
+  }
+  function renderPicker(msg) {
+    ["call", "put"].forEach(function (side) {
+      var rows = S.rows.filter(function (i) { return i.type === side; });
+      var tgt = null, tgtD = 9;
+      rows.forEach(function (i) { var q = S.pq[i.id], d = q && num(q.delta), sp = q && spreadPct(q); if (d == null || sp == null || sp > WIDE) return; d = Math.abs(d); if (d < 0.35 || d > 0.65) return; if (Math.abs(d - 0.525) < tgtD) { tgtD = Math.abs(d - 0.525); tgt = i.id; } });
+      $("tb-" + side).innerHTML = rows.length ? rows.map(function (i) {
+        var q = S.pq[i.id] || {}, sp = spreadPct(q), wide = sp != null && sp > WIDE, k = num(i.strike_price);
+        return '<tr class="' + (S.sel === i.id ? "sel " : "") + (wide ? "wide " : "") + (k === S.atm ? "atm" : "") + '"><td><button type="button" class="pick" data-id="' + esc(i.id) + '">' + f(k, k % 1 ? 1 : 0) + "</button>" + (i.id === tgt ? ' <span class="chip pos">target</span>' : "") + "</td><td>" +
+          f(num(q.bid_price)) + "</td><td>" + f(num(q.ask_price)) + '</td><td class="spr">' + (sp == null ? "—" : f(sp, 1) + "%") + (wide ? ' <span class="chip warn">wide</span>' : "") + "</td><td>" +
+          f(num(q.delta), 3) + "</td><td>" + f(num(q.theta), 3) + "</td><td>" + (num(q.implied_volatility) == null ? "—" : f(num(q.implied_volatility) * 100, 1) + "%") + "</td><td>" +
+          (q.volume == null ? "—" : Number(q.volume).toLocaleString("en-US")) + "</td><td>" + (q.open_interest == null ? "—" : Number(q.open_interest).toLocaleString("en-US")) + "</td></tr>";
+      }).join("") : '<tr><td colspan="9" class="t muted' + (msg ? " loading" : "") + '">' + esc(msg || (S.mcp ? "No contracts to show." : "Needs live connectors.")) + "</td></tr>";
+    });
+  }
+
+  /* ---------- 4 trade plan ---------- */
+  function renderPlan() {
+    var i = S.rows.filter(function (r) { return r.id === S.sel; })[0], q = i && S.pq[i.id], el = $("plan");
+    if (!i || !q) { el.innerHTML = '<p class="empty">Pick a strike in the contract picker.</p>'; return; }
+    var ask = num(q.ask_price), k = num(i.strike_price), mult = num(i.trade_value_multiplier) || 100, call = i.type === "call", px = last(S.sym);
+    if (!ask) { el.innerHTML = '<p class="empty">This contract has no ask right now.</p>'; return; }
+    var cost = ask * mult, be = call ? k + ask : k - ask, bePct = px ? (be - px) / px * 100 : null, sp = spreadPct(q);
+    var tv = S.portfolio ? num(S.portfolio.total_value) : null, cap = tv != null ? tv * CAP : null, n = cap != null ? Math.floor(cap / cost) : null;
+    var item = function (t, v, sub) { return "<div><dt>" + t + "</dt><dd>" + v + (sub ? "<small>" + sub + "</small>" : "") + "</dd></div>"; };
+    el.innerHTML = '<p class="ctitle">' + esc(S.sym) + " " + esc(i.expiration_date) + " " + f(k, k % 1 ? 1 : 0) + (call ? " Call" : " Put") +
+      (sp != null && sp > WIDE ? ' <span class="chip warn">wide spread ' + f(sp, 1) + "%</span>" : "") + "</p><dl class=\"kv\">" +
+      item("Entry at ask", usd(ask), "bid " + f(num(q.bid_price)) + " · mark " + f(num(q.mark_price))) +
+      item("Cost per contract", usd(cost), "ask × " + mult) +
+      item("Break-even at expiry", f(be), px ? pct(bePct) + " from " + f(px) : "") +
+      item("Stop at −10%", usd(ask * (1 - STOP)), "lose " + usd(cost * STOP) + " per contract") +
+      item("Scale-out at +5%", usd(ask * 1.05), "gain " + usd(cost * 0.05) + " per contract") +
+      item("Scale-out at +10%", usd(ask * 1.10), "gain " + usd(cost * 0.10) + " per contract") +
+      item("Account value", usd(tv), S.account ? "account ••" + esc(S.account.slice(-4)) : "choose an account") +
+      item("5% cap", usd(cap), "") +
+      item("Max contracts", n == null ? "—" : String(n), n ? "total " + usd(n * cost) + " · risk at stop " + usd(n * cost * STOP) : "") + "</dl>" +
+      (n === 0 ? '<p class="note warn">One contract costs ' + usd(cost) + ", which is above the " + usd(cap) + " cap for this account. Size is zero.</p>" : "") +
+      (tv == null ? '<p class="note">Account value has not loaded, so size is not shown.</p>' : "");
+  }
+
+  /* ---------- 5 positions ---------- */
+  var posBase = $("src-pos").textContent;
+  function loadAccounts() {
+    return call(RH, "get_accounts", {}, { cache: { staleTime: 3600000, gcTime: 7200000 } }).then(function (r) {
+      S.accounts = ((body(r) || {}).accounts || []).filter(function (a) { return a.state === "active" && a.option_level; });
+      var saved = store.get("osd:acct"), pick = S.accounts.filter(function (a) { return a.account_number === saved; })[0];
+      S.account = pick ? pick.account_number : null;
+      $("acct").innerHTML = (S.account ? "" : '<option value="">Choose…</option>') + S.accounts.map(function (a) {
+        return '<option value="' + esc(a.account_number) + '"' + (a.account_number === S.account ? " selected" : "") + ">" + esc(a.nickname || String(a.brokerage_account_type).replace(/_/g, " ")) + " ••" + esc(String(a.account_number).slice(-4)) + "</option>";
+      }).join("");
+      return loadPositions();
+    }).catch(function (e) { $("acct").innerHTML = '<option value="">Unavailable</option>'; $("pos").innerHTML = ""; showErr("err-pos", explain(e, RH)); });
+  }
+  function loadPositions() {
+    if (!S.account) { $("pos").innerHTML = '<p class="empty">Choose an account to see positions and sizing.</p>'; return Promise.resolve(); }
+    var acct = S.account;
+    return Promise.all([
+      call(RH, "get_portfolio", { account_number: acct }, { cache: false }),
+      call(RH, "get_option_positions", { account_number: acct, nonzero: true }, { cache: false })
+    ]).then(function (a) {
+      if (acct !== S.account) return;
+      S.portfolio = body(a[0]) || null; S.positions = (body(a[1]) || {}).positions || [];
+      var ids = S.positions.map(function (p) { return p.option_id || p.option || p.instrument_id; }).filter(Boolean);
+      if (!ids.length) return;
+      return Promise.all([call(RH, "get_option_instruments", { ids: ids.join(",") }, { cache: { staleTime: 21600000, gcTime: 43200000 } }), getQuotes(ids)]).then(function (b) {
+        S.posIns = {}; ((body(b[0]) || {}).instruments || []).forEach(function (i) { S.posIns[i.id] = i; }); S.posQ = b[1];
+      });
+    }).then(function () { if (acct !== S.account) return; showErr("err-pos", ""); stamp("src-pos", posBase, Date.now()); renderPositions(); renderPlan(); })
+      .catch(function (e) { if (DENIED[e && e.code]) { S.portfolio = null; S.positions = null; $("pos").innerHTML = ""; } showErr("err-pos", explain(e, RH)); renderPlan(); });
+  }
+  function renderPositions() {
+    var el = $("pos"), x = exitText();
+    var head = '<p class="note" style="margin:0 0 8px">Time to 3:45 PM ET exit: <span class="num" id="pos-exit">' + esc(x.t) + "</span>" +
+      (S.portfolio ? " · account value <span class=\"num\">" + usd(num(S.portfolio.total_value)) + "</span>" : "") + "</p>";
+    if (!S.positions) { el.innerHTML = head; return; }
+    if (!S.positions.length) { el.innerHTML = head + '<div class="panel"><p class="empty" style="padding:4px">No open option positions in this account.</p></div>'; return; }
+    el.innerHTML = head + '<div class="scroll"><table><thead><tr><th>Contract</th><th>Qty</th><th>Avg cost</th><th>Mark</th><th>P&amp;L</th><th>P&amp;L %</th><th>Stop</th><th>To stop</th></tr></thead><tbody>' +
+      S.positions.map(function (p) {
+        var id = p.option_id || p.option || p.instrument_id, i = S.posIns[id] || {}, q = S.posQ[id] || {}, mult = num(p.trade_value_multiplier) || num(i.trade_value_multiplier) || 100;
+        var qty = num(p.quantity), avg = num(p.average_price) != null ? Math.abs(num(p.average_price)) / mult : null, mark = num(q.mark_price), short = p.type === "short", dir = short ? -1 : 1;
+        var pl = avg != null && mark != null && qty != null ? (mark - avg) * qty * mult * dir : null, plp = avg ? (mark - avg) / avg * 100 * dir : null;
+        var stop = avg != null && !short ? avg * (1 - STOP) : null, toStop = stop != null && mark ? (mark - stop) / mark * 100 : null, k = num(i.strike_price);
+        return '<tr><td class="t"><b>' + esc(p.chain_symbol || i.chain_symbol || "?") + "</b> " + esc(p.expiration_date || i.expiration_date || "") + " " + (k == null ? "" : f(k, k % 1 ? 1 : 0)) + " " + esc(i.type || "") + (short ? ' <span class="chip warn">short</span>' : "") +
+          "</td><td>" + f(qty, 0) + "</td><td>" + f(avg) + "</td><td>" + f(mark) + '</td><td class="' + cls(pl) + '">' + usd(pl) + '</td><td class="' + cls(plp) + '">' + pct(plp, 1) + "</td><td>" + f(stop) + "</td><td>" +
+          (toStop == null ? "—" : toStop <= 0 ? '<span class="chip warn">at or below stop</span>' : f(toStop, 1) + "% above") + "</td></tr>";
+      }).join("") + "</tbody></table></div>";
+  }
+
+  /* ---------- 6 events ---------- */
+  function loadEvents() {
+    var today = et().date;
+    TICKERS.forEach(function (t) {
+      if (t.etf) return;
+      call(FMP, "calendar", { endpoint: "earnings-company", symbol: t.s, limit: 3 }, { cache: { staleTime: 3600000, gcTime: 7200000 } }).then(function (r) {
+        var rows = body(r); rows = Array.isArray(rows) ? rows.filter(function (x) { return x && x.symbol === t.s && x.date; }) : [];
+        var next = rows.filter(function (x) { return x.date >= today; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; })[0];
+        var prev = rows.filter(function (x) { return x.date < today; }).sort(function (a, b) { return a.date < b.date ? 1 : -1; })[0];
+        S.earn[t.s] = { next: next, prev: prev }; stamp("src-earn", earnBase, when(r)); renderEarn(); if (S.pick) rankLiq();
+      }).catch(function (e) { S.earn[t.s] = { error: true }; showErr("err-earn", explain(e, FMP)); renderEarn(); });
+    });
+    call(TV, "mcp-tv-get-economic-calendar", { countries: "US", min_importance: 1, date_from: today, date_to: today + "T23:59:59Z" }, { cache: { staleTime: 900000, gcTime: 3600000 } }).then(function (r) {
+      var p = r && r.payload; if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) {} }
+      S.econ = ((p && p.result) || []).filter(function (x) { return x && x.importance >= 1; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+      stamp("src-econ", econBase, when(r)); renderEcon();
+    }).catch(function (e) { S.econ = null; showErr("err-econ", explain(e, TV)); renderEcon(true); });
+  }
+  var earnBase = $("src-earn").textContent, econBase = $("src-econ").textContent;
+  function renderEarn() {
+    $("earn").innerHTML = TICKERS.map(function (t) {
+      if (t.etf) return '<tr><td class="t"><b>' + t.s + '</b></td><td colspan="4" class="t muted">Fund, no earnings</td></tr>';
+      var e = S.earn[t.s];
+      if (!e) return '<tr><td class="t"><b>' + t.s + '</b></td><td colspan="4" class="t muted' + (S.mcp ? " loading" : "") + '">' + (S.mcp ? "Loading…" : "Needs live connectors.") + "</td></tr>";
+      if (e.error) return '<tr><td class="t"><b>' + t.s + '</b></td><td colspan="4" class="t muted">Unavailable</td></tr>';
+      var d = e.next ? dte(e.next.date) : null;
+      return '<tr><td class="t"><b>' + t.s + "</b></td><td>" + (e.next ? esc(e.next.date) : '<span class="muted">none listed</span>') + "</td><td>" + (d == null ? "—" : d + (d <= 5 ? ' <span class="chip warn">soon</span>' : "")) + "</td><td>" +
+        (e.next && e.next.epsEstimated != null ? f(+e.next.epsEstimated) : "—") + "</td><td>" + (e.prev ? esc(e.prev.date) : "—") + "</td></tr>";
+    }).join("");
+  }
+  function renderEcon(failed) {
+    var v = function (x, e) { return x == null ? "—" : f(+x, Math.abs(+x) < 10 ? 2 : 1) + esc(e.unit === "%" ? "%" : e.scale || ""); };
+    $("econ").innerHTML = failed ? '<tr><td colspan="5" class="t muted">Unavailable</td></tr>' :
+      !S.econ ? '<tr><td colspan="5" class="t muted' + (S.mcp ? " loading" : "") + '">' + (S.mcp ? "Loading…" : "Needs live connectors.") + "</td></tr>" :
+      !S.econ.length ? '<tr><td colspan="5" class="t muted">No high-impact US releases scheduled today.</td></tr>' :
+      S.econ.map(function (e) { return "<tr><td>" + etTime(Date.parse(e.date), false) + '</td><td class="t" style="text-align:left;white-space:normal">' + esc(e.title) + "</td><td>" + v(e.actual, e) + "</td><td>" + v(e.forecast, e) + "</td><td>" + v(e.previous, e) + "</td></tr>"; }).join("");
+  }
+
+  /* ---------- wiring ---------- */
+  $("tiles").addEventListener("click", function (ev) {
+    var b = ev.target.closest(".tile"); if (!b) return; S.userPicked = true; if (b.dataset.sym === S.sym) return;
+    S.sym = b.dataset.sym; S.exp = null; renderUnder(); renderLevels(); if (S.mcp) loadChain();
+  });
+  $("exp").addEventListener("change", function () { S.exp = this.value; S.sel = null; S.rows = []; S.pq = {}; renderPlan(); if (S.mcp) loadStrikes(++S.tok); });
+  ["call", "put"].forEach(function (side) {
+    $("seg-" + side).addEventListener("click", function () {
+      S.side = side; $("chain").className = "chain show-" + side;
+      $("seg-call").setAttribute("aria-pressed", side === "call"); $("seg-put").setAttribute("aria-pressed", side === "put");
+    });
+    $("tb-" + side).addEventListener("click", function (ev) { var b = ev.target.closest(".pick"); if (!b) return; S.sel = b.dataset.id; renderPicker(); renderPlan(); });
+  });
+  $("acct").addEventListener("change", function () { S.account = this.value || null; store.set("osd:acct", S.account); S.portfolio = null; S.positions = null; renderPositions(); renderPlan(); if (S.mcp) loadPositions(); });
+  $("refresh").addEventListener("click", function () {
+    if (!S.mcp) return;
+    S.mcp.invalidate(RH, "get_equity_quotes").catch(function () {}); S.mcp.invalidate(TV, "mcp-tv-get-symbol-data-batch").catch(function () {});
+    if (S.rows.length) refreshPicker(); else loadChain();
+    loadPositions(); loadEvents(); scanAll();
+    SYMS.forEach(function (s) { if (S.lvlStatus[s] === "failed") S.lvlStatus[s] = null; });
+    if (SYMS.some(function (s) { return !S.levels[s] && !S.lvlStatus[s]; })) allLevels(false);
+  });
+  $("recompute").addEventListener("click", function () { if (S.mcp && !SYMS.some(function (s) { var x = S.lvlStatus[s]; return x && x !== "failed"; })) allLevels(true); });
+
+  function start() {
+    renderUnder(); renderLevels(); renderPicker(); renderEarn(); renderEcon(); tick(); setInterval(tick, 1000);
+    var use = window.claude && window.claude.use;
+    if (!use) return offline();
+    Promise.all([window.claude.use("mcp"), window.claude.use("permissions")]).then(function (a) {
+      S.mcp = a[0]; if (!S.mcp) return offline();
+      var ask = a[1] ? a[1].request(["mcp"]).catch(function () {}) : Promise.resolve();
+      return ask.then(function () {
+        watchUnder(); loadChain(); loadAccounts(); loadEvents(); scanAll().then(function () { return allLevels(false); });
+        setInterval(function () { if (document.visibilityState === "visible") scanAll(); }, 120000);
+        setInterval(function () { if (document.visibilityState === "visible") { refreshPicker(); loadPositions(); } }, 30000);
+      });
+    });
+  }
+  function offline() {
+    $("banner").hidden = false;
+    $("pickline").textContent = "Liquidity rank needs live connectors.";
+    $("banner").textContent = "Live data is off in this view. Open the page in claude.ai while signed in, and allow Robinhood Trading, RH TV HFT and FMP when asked.";
+    renderLevels(); renderPicker(); renderEarn(); renderEcon(); $("pos").innerHTML = ""; $("acct").innerHTML = '<option value="">Unavailable</option>';
+  }
+  start();
+})();
+</script>
