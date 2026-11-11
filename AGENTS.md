@@ -11,7 +11,7 @@
   - Web 前端改动在 `apps/dsa-web/`
   - 桌面端改动在 `apps/dsa-desktop/`
   - 部署与流水线改动在 `scripts/`、`.github/workflows/`、`docker/`
-- 未经明确确认，不执行 `git commit`、`git tag`、`git push`。
+- 本地交互会话中，未经明确确认不执行 `git commit`、`git tag`、`git push`。云端会话可在其指定的工作分支上提交、推送并创建 draft PR；`git tag`、强制推送和推送到其他分支仍需明确确认。
 - commit message 使用英文，不添加 `Co-Authored-By`。
 - 不写死密钥、账号、路径、模型名、端口或环境差异逻辑。
 - 优先复用现有模块、配置入口、脚本和测试，不新增平行实现。
