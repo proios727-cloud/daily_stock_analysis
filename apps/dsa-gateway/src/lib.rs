@@ -49,16 +49,16 @@ pub fn build_app(config: Config) -> Router {
         client: backend_client(),
     };
     Router::new()
-        .route("/health", get(health::health).fallback(proxy::proxy))
-        .route("/api/health", get(health::health).fallback(proxy::proxy))
-        .route("/api/v1/health", get(health::health).fallback(proxy::proxy))
+        .route("/health", get(health::health).head(proxy::proxy).fallback(proxy::proxy))
+        .route("/api/health", get(health::health).head(proxy::proxy).fallback(proxy::proxy))
+        .route("/api/v1/health", get(health::health).head(proxy::proxy).fallback(proxy::proxy))
         .route(
             "/api/v1/usage/summary",
-            get(usage::summary).fallback(proxy::proxy),
+            get(usage::summary).head(proxy::proxy).fallback(proxy::proxy),
         )
         .route(
             "/api/v1/usage/dashboard",
-            get(usage::dashboard).fallback(proxy::proxy),
+            get(usage::dashboard).head(proxy::proxy).fallback(proxy::proxy),
         )
         .fallback(proxy::proxy)
         .with_state(state)

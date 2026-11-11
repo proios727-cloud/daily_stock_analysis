@@ -16,7 +16,7 @@ BACKEND = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000"
 GATEWAY = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:8080"
 
 # (path, mode): "exact" compares status and JSON body; "health" ignores the
-# timestamp value; "validation" compares status, error and the detail locations;
+# timestamp value; "validation" compares status, error, and each detail loc and type;
 # "as_of" compares status and JSON body after dropping the top-level as_of field.
 CASES = [
     ("/health", "health"),
@@ -32,6 +32,13 @@ CASES = [
     ("/api/v1/usage/dashboard?limit=0", "validation"),
     ("/api/v1/usage/dashboard?limit=201", "validation"),
     ("/api/v1/usage/dashboard?limit=abc", "validation"),
+    ("/api/v1/usage/dashboard?limit=1.5", "validation"),
+    ("/api/v1/usage/dashboard?limit=0.0", "validation"),
+    ("/api/v1/usage/dashboard?limit=99999999999999999999", "validation"),
+    ("/api/v1/usage/dashboard?limit=-99999999999999999999", "validation"),
+    ("/api/v1/usage/dashboard?period=all&limit=5.0", "exact"),
+    ("/api/v1/usage/dashboard?period=all&limit=1_0", "exact"),
+    ("/api/v1/usage/dashboard?period=all&limit=%2B2", "exact"),
     ("/api/v1/data/overview", "as_of"),
     ("/api/v1/auth/status", "exact"),
     ("/api/v1/no-such-route", "exact"),
@@ -73,8 +80,8 @@ def main() -> int:
                 and isinstance(g_body, dict)
                 and g_body.get("error") == b_body.get("error")
                 and g_body.get("message") == b_body.get("message")
-                and [d.get("loc") for d in g_body.get("detail", [])]
-                == [d.get("loc") for d in b_body.get("detail", [])]
+                and [(d.get("loc"), d.get("type")) for d in g_body.get("detail", [])]
+                == [(d.get("loc"), d.get("type")) for d in b_body.get("detail", [])]
             )
         elif mode == "as_of":
             ok = (

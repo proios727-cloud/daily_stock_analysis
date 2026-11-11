@@ -114,38 +114,84 @@ fn last_param<'a>(pairs: &'a [(String, String)], name: &str) -> Option<&'a str> 
         .map(|(_, v)| v.as_str())
 }
 
+/// Outcome of reading `limit` the way pydantic's lax integer parsing does.
+enum LimitInput {
+    Value(i64),
+    /// An integer too large for i64; only its sign matters for the range error.
+    Huge { negative: bool },
+    Invalid,
+}
+
+/// Accepts what Python accepts for an `int` query parameter: optional sign,
+/// digits with single underscores between them, and a decimal form whose
+/// fractional part is all zeros (`5.0`).
+fn read_limit(raw: &str) -> LimitInput {
+    let text = raw.trim();
+    let (negative, unsigned) = match text.as_bytes().first() {
+        Some(b'-') => (true, &text[1..]),
+        Some(b'+') => (false, &text[1..]),
+        _ => (false, text),
+    };
+    let (int_part, frac_part) = match unsigned.split_once('.') {
+        Some((int_part, frac_part)) => (int_part, Some(frac_part)),
+        None => (unsigned, None),
+    };
+    if let Some(frac) = frac_part {
+        if frac.is_empty() || !frac.bytes().all(|b| b == b'0') {
+            return LimitInput::Invalid;
+        }
+    }
+    let well_formed = !int_part.is_empty()
+        && !int_part.starts_with('_')
+        && !int_part.ends_with('_')
+        && !int_part.contains("__")
+        && int_part.bytes().all(|b| b.is_ascii_digit() || b == b'_');
+    if !well_formed {
+        return LimitInput::Invalid;
+    }
+    let digits: String = int_part.chars().filter(|c| *c != '_').collect();
+    match digits.parse::<i64>() {
+        Ok(value) => LimitInput::Value(if negative { -value } else { value }),
+        Err(_) => LimitInput::Huge { negative },
+    }
+}
+
 fn parse_limit(raw: Option<&str>) -> Result<i64, Value> {
     let Some(raw) = raw else {
         return Ok(DEFAULT_LIMIT);
     };
     let loc = json!(["query", "limit"]);
-    let value: i64 = raw.trim().parse().map_err(|_| {
+    let too_small = || {
         json!({
-            "type": "int_parsing",
-            "loc": loc,
-            "msg": "Input should be a valid integer, unable to parse string as an integer",
-            "input": raw,
-        })
-    })?;
-    if value < MIN_LIMIT {
-        return Err(json!({
             "type": "greater_than_equal",
             "loc": loc,
             "msg": format!("Input should be greater than or equal to {MIN_LIMIT}"),
             "input": raw,
             "ctx": {"ge": MIN_LIMIT},
-        }));
-    }
-    if value > MAX_LIMIT {
-        return Err(json!({
+        })
+    };
+    let too_large = || {
+        json!({
             "type": "less_than_equal",
             "loc": loc,
             "msg": format!("Input should be less than or equal to {MAX_LIMIT}"),
             "input": raw,
             "ctx": {"le": MAX_LIMIT},
-        }));
+        })
+    };
+    match read_limit(raw) {
+        LimitInput::Invalid => Err(json!({
+            "type": "int_parsing",
+            "loc": loc,
+            "msg": "Input should be a valid integer, unable to parse string as an integer",
+            "input": raw,
+        })),
+        LimitInput::Huge { negative: true } => Err(too_small()),
+        LimitInput::Huge { negative: false } => Err(too_large()),
+        LimitInput::Value(value) if value < MIN_LIMIT => Err(too_small()),
+        LimitInput::Value(value) if value > MAX_LIMIT => Err(too_large()),
+        LimitInput::Value(value) => Ok(value),
     }
-    Ok(value)
 }
 
 fn query_pairs(
@@ -352,6 +398,39 @@ fn called_at_text(value: ValueRef<'_>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn limit_error_type(raw: &str) -> String {
+        parse_limit(Some(raw)).unwrap_err()["type"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+
+    #[test]
+    fn limit_parsing_matches_python_lax_int() {
+        assert_eq!(parse_limit(None).unwrap(), DEFAULT_LIMIT);
+        for (raw, expected) in [
+            ("1", 1),
+            ("200", 200),
+            (" 7 ", 7),
+            ("+5", 5),
+            ("007", 7),
+            ("5.0", 5),
+            ("200.0", 200),
+            ("1_0", 10),
+        ] {
+            assert_eq!(parse_limit(Some(raw)).unwrap(), expected, "{raw}");
+        }
+        for raw in ["abc", "", "1.5", "5.", ".0", "_1", "1_", "1__0", "1e2", "--1"] {
+            assert_eq!(limit_error_type(raw), "int_parsing", "{raw}");
+        }
+        for raw in ["0", "-1", "0.0", "-99999999999999999999"] {
+            assert_eq!(limit_error_type(raw), "greater_than_equal", "{raw}");
+        }
+        for raw in ["201", "201.0", "9223372036854775808", "99999999999999999999"] {
+            assert_eq!(limit_error_type(raw), "less_than_equal", "{raw}");
+        }
+    }
 
     #[test]
     fn period_normalization() {

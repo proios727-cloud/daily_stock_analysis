@@ -50,3 +50,26 @@ cargo clippy --all-targets -- -D warnings
 
 Integration tests live in `tests/` (health, usage, auth, proxy) and start the
 gateway on an ephemeral port against an in-process axum stub backend.
+
+## Known differences from calling the Python backend directly
+
+- **Client address.** The backend sees every request as coming from the
+  gateway. The gateway appends the real client IP to `X-Forwarded-For`, but the
+  backend only reads it when `TRUST_X_FORWARDED_FOR=true`. Without that
+  setting, login rate limiting counts all clients as one address.
+- **Health.** The gateway's health routes report that the gateway is alive,
+  not that the backend is.
+- **Dot segments.** The HTTP client normalises paths before forwarding, so
+  `/a/./b` and `/%2e%2e/x` reach the backend as `/a/b` and `/x`. The backend's
+  auth middleware sees the normalised path, so this does not bypass auth.
+- **`OPTIONS *`** returns 502 from the gateway (404 from the backend).
+- **`Host`.** The backend receives its own host; the original is sent as
+  `X-Forwarded-Host`.
+- A request with both `Content-Length` and `Transfer-Encoding: chunked` is
+  re-framed and forwarded; the backend alone would reject it with 400.
+
+Not covered by tests: HTTP/2, a real Server-Sent Events stream from the
+backend, and a real logged-in session (auth is tested against a stub backend).
+
+`scripts/parity_check.py` compares the gateway with a running backend request
+by request; see `docs/rust-gateway-pilot.md`.
