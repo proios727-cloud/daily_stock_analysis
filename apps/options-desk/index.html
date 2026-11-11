@@ -63,6 +63,7 @@ h2{font-family:var(--cond);font-size:13px;font-weight:600;text-transform:upperca
 .chip.top{background:var(--accent);color:var(--accent-ink)}
 .pickline{margin:0 0 10px;font-size:15px;max-width:70ch}
 .pickline b{font-family:var(--cond)}
+h3.sub{font-family:var(--cond);font-size:13px;font-weight:600;margin:18px 0 6px}
 .tile .liq{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:5px;min-height:18px}
 
 .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
@@ -138,12 +139,18 @@ details .doc ul{margin:4px 0;padding-left:18px}
 
   <section id="p-levels">
     <div class="head"><h2>2 · Dealer levels</h2>
-      <div class="ctl"><button class="btn ghost" id="recompute" type="button">Recompute levels</button></div></div>
+      <div class="ctl"><button class="btn ghost" id="recompute" type="button">Rebuild levels now</button></div></div>
     <div class="scroll"><table>
       <thead><tr><th>Ticker</th><th>Spot at compute</th><th>Gamma flip</th><th>Flip vs spot</th><th>Call wall</th><th>Put wall</th><th>Regime</th><th>Map</th><th>Contracts</th><th>Computed (ET)</th></tr></thead>
       <tbody id="lvl-body"></tbody></table></div>
     <div class="bar" id="bar" aria-hidden="true"></div>
-    <p class="src">Computed once per day in your browser from the live Robinhood chain (get_option_chains → get_option_instruments → get_option_quotes) with the gex-vex-heatseeker method: expirations 0–7 days out plus the next two Fridays, strikes within ±3% of spot, calls +gamma and puts −gamma, flip found by re-deriving Black-Scholes gamma across ±6% of spot. "Map" compares the open-interest map with one that adds 30% of today's volume; under 0.15% flip drift is stable.</p>
+    <p class="src">Rebuilt in your browser from the live Robinhood chain (get_option_chains → get_option_instruments → get_option_quotes) with the gex-vex-heatseeker method whenever the map is more than 30 minutes old: on open, on Refresh, and every 30 minutes while the market is open. Expirations 0–7 days out plus the next two Fridays, strikes within ±3% of spot, calls +gamma and puts −gamma, flip found by re-deriving Black-Scholes gamma across ±6% of spot with expiry at 4:00 PM New York time. "Map" compares the open-interest map with one that adds 30% of today's volume; under 0.15% flip drift is stable. "None in loaded strikes" means no flip or wall inside the ±3% band, not that none exists.</p>
+    <h3 class="sub">Gate check</h3>
+    <p class="pickline" id="gateline">Waiting for data…</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Ticker</th><th style="text-align:left">Verdict</th><th>Volume ratio</th><th>Earnings</th><th>Flip within ±2%</th><th>Flow drift</th><th>Regime vs flip</th><th>Index backs</th><th>Vanna</th><th>Day move</th><th>Today's vol ÷ OI</th><th>Map age</th></tr></thead>
+      <tbody id="gate-body"></tbody></table></div>
+    <p class="src">Gates are the numeric ones from the heatseeker skill, checked in order: entry window (9:45 AM–3:35 PM ET), earnings more than 3 sessions away (FMP), volume ratio of 1.4 or more (today's volume ÷ 10-day average × elapsed share of the session, TradingView), map under 30 minutes old, flip within ±2% of spot, flow drift under 0.15%, regime sign agreeing with spot versus flip, SPY or QQQ on the right side of VWAP and prior close, and for the four single names vanna aligned in both maps. A gate that cannot be evaluated counts as failed. Setup triggers on 5-minute bars are not checked here, so "gates clear" is never a buy signal. Day move and today's vol ÷ OI are cautions to read yourself: a damped (+GEX) map on a hard-trending day, or volume several times open interest, means the map deserves less weight.</p>
     <p class="err" id="err-levels" hidden></p>
   </section>
 
@@ -177,6 +184,13 @@ details .doc ul{margin:4px 0;padding-left:18px}
     </section>
   </div>
 
+  <section id="p-ledger" hidden>
+    <div class="head"><h2>Desk log</h2><span class="muted" style="font-size:12px" id="ledger-count"></span></div>
+    <div class="scroll"><table><thead><tr><th>Time (ET)</th><th>Ticker</th><th style="text-align:left">Verdict</th><th>Spot</th><th>Flip</th><th>King node</th><th>Volume ratio</th><th>Reference call</th><th>Reference put</th></tr></thead><tbody id="ledger-body"></tbody></table></div>
+    <p class="src" id="src-ledger">One entry is saved to this page's own store after each levels rebuild, no-trade reads included. Reference contracts are the nearest 0.50–0.55 delta call and put on the first expiration at least a day out, with bid / ask at rebuild time; they are a record, not a recommendation. The two most recent reads are shown.</p>
+    <p class="err" id="err-ledger" hidden></p>
+  </section>
+
   <section id="p-events">
     <div class="head"><h2>Events</h2></div>
     <div class="two">
@@ -197,7 +211,8 @@ details .doc ul{margin:4px 0;padding-left:18px}
         <li>Prices, VWAP and RSI update on their own about every 30 seconds while the page is visible. Contract quotes, account value and positions update on the same beat.</li>
         <li>Refresh re-pulls every panel at once. Each panel shows the time of its last successful pull.</li>
         <li>The liquidity rank and top pick refresh every two minutes and on Refresh. The page opens on the top pick once; after that it never switches ticker on its own.</li>
-        <li>Dealer levels are computed once per trading day and kept in this browser. Recompute levels rebuilds them from the chain as it stands now; the first build of the day takes up to a minute because SPY and QQQ carry several hundred contracts.</li>
+        <li>Dealer levels and the gate check rebuild whenever the map is more than 30 minutes old: when you open the page, on Refresh, and every 30 minutes while the market is open. Rebuild levels now forces it. A rebuild can take up to a minute because SPY and QQQ carry several hundred contracts; the previous map stays on screen meanwhile.</li>
+        <li>Each rebuild adds one entry to the Desk log.</li>
         <li>Earnings dates and the economic calendar load once per page open.</li>
         <li>Choose your account once in Open positions. The page remembers it in this browser; no account number is stored in the page itself.</li>
       </ul>
@@ -206,7 +221,8 @@ details .doc ul{margin:4px 0;padding-left:18px}
         <li>Orders. The page can only read; it holds no tool that previews, places, cancels or exercises anything.</li>
         <li>Spreads, short options and assigned stock. Sizing and stops assume one long call or one long put.</li>
         <li>Market holidays and half days. The 3:45 PM ET countdown runs on the clock alone.</li>
-        <li>Intraday rebuilds of the dealer map, air pockets, vanna and charm tables, and the heatseeker entry gates. Open interest is published a day late, so levels describe yesterday's board adjusted only by the stability check.</li>
+        <li>Setup triggers. The gate check covers the numeric gates only; the six heatseeker setups, their 5-minute-bar triggers, air pockets and charm are not evaluated, so the page never issues a buy signal.</li>
+        <li>Strikes beyond ±3% of spot. A flip or wall outside that band shows as "none in loaded strikes". Open interest is published a day late, so levels describe yesterday's board adjusted only by the stability check.</li>
         <li>Dividends, early exercise and fees in break-even. Break-even is strike plus or minus the ask.</li>
         <li>Direction. The top pick is the most liquid ticker, not a call-or-put signal.</li>
         <li>Slippage. Stops and scale-outs are premium levels, not resting orders.</li>
@@ -228,10 +244,13 @@ var GEX = (function () {
   }
   function gamma(S, K, T, s, r) { var d = d12(S, K, T, s, r); return d ? pdf(d[0]) / (S * s * Math.sqrt(T)) : 0; }
   function vanna(S, K, T, s, r) { var d = d12(S, K, T, s, r); return d ? -pdf(d[0]) * d[1] / s : 0; }
-  function years(expiry, asofMs) {
-    var p = expiry.split("-").map(Number), exp = Date.UTC(p[0], p[1] - 1, p[2], 20, 0, 0);
-    return Math.max((exp - asofMs) / (365 * 24 * 3600 * 1000), MIN_T);
+  /* Options stop trading at 16:00 New York time. The source script pins 20:00 UTC all year, which is an hour early in winter. */
+  function closeUtc(expiry) {
+    var p = expiry.split("-").map(Number), t = Date.UTC(p[0], p[1] - 1, p[2], 20, 0, 0);
+    try { var h = +new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hour12: false }).format(new Date(t)); if (h === 15) t += 3600000; else if (h === 17) t -= 3600000; } catch (e) {}
+    return t;
   }
+  function years(expiry, asofMs) { return Math.max((closeUtc(expiry) - asofMs) / (365 * 24 * 3600 * 1000), MIN_T); }
   function build(chain, flow) {
     var asof = Date.parse(chain.asof), out = [];
     chain.contracts.forEach(function (c) {
@@ -249,10 +268,10 @@ var GEX = (function () {
   function analyze(chain, flow) {
     var spot = +chain.spot, r = chain.risk_free_rate == null ? 0.04 : +chain.risk_free_rate, cs = build(chain, flow);
     if (!cs.length) return null;
-    var gex = new Map(), vex = new Map();
+    var gex = new Map(), vex = new Map(), oiK = new Map();
     cs.forEach(function (c) {
       var sign = c.type === "call" ? 1 : -1, g = c.gamma != null ? c.gamma : gamma(spot, c.K, c.T, c.iv, r);
-      gex.set(c.K, (gex.get(c.K) || 0) + sign * g * c.oi * 100 * spot * spot * 0.01);
+      gex.set(c.K, (gex.get(c.K) || 0) + sign * g * c.oi * 100 * spot * spot * 0.01); oiK.set(c.K, (oiK.get(c.K) || 0) + c.oi);
       vex.set(c.K, (vex.get(c.K) || 0) + sign * vanna(spot, c.K, c.T, c.iv, r) * c.oi * 100 * spot * 0.01);
     });
     var net = 0, netVex = 0; gex.forEach(function (v) { net += v; }); vex.forEach(function (v) { netVex += v; });
@@ -274,17 +293,18 @@ var GEX = (function () {
       vanna_alignment: (net > 0) === (netVex > 0) ? "aligned" : "divergent",
       flip_levels: flips.map(rd), nearest_flip: nearest ? rd(nearest) : null,
       flip_distance_pct: nearest ? rd((nearest - spot) / spot * 100) : null,
-      king_node: king, call_wall: cw, put_wall: pw, contracts: cs.length };
+      king_node: king, king_oi: king == null ? null : oiK.get(king), call_wall: cw, put_wall: pw, contracts: cs.length };
   }
   function compare(chain) {
     var plain = analyze(chain, false), flow = analyze(chain, true);
     if (!plain) return null;
-    var pf = plain.nearest_flip, ff = flow && flow.nearest_flip, drift = null, verdict = "unknown";
+    var pf = plain.nearest_flip, ff = flow && flow.nearest_flip, drift = null, verdict = "not established";
     if (pf && ff) { drift = Math.abs(ff - pf) / plain.spot * 100; verdict = drift < 0.15 ? "stable" : "contested"; }
     plain.flow_flip = ff || null; plain.drift_pct = drift; plain.confidence = verdict;
+    plain.flow_vanna = flow ? flow.vanna_alignment : null; plain.flow_net_gex = flow ? flow.net_gex : null;
     return plain;
   }
-  return { analyze: analyze, compare: compare };
+  return { analyze: analyze, compare: compare, closeUtc: closeUtc };
 })();
 if (typeof module !== "undefined") module.exports = GEX;
 </script>
@@ -299,7 +319,7 @@ if (typeof module !== "undefined") module.exports = GEX;
   var SYMS = TICKERS.map(function (t) { return t.s; });
   var WIDE = 10, STOP = 0.10, CAP = 0.05, WINDOW = 7;
   var S = { mcp: null, sym: "SPY", quotes: {}, tv: {}, levels: {}, lvlStatus: {}, exps: [], exp: null, rows: [], pq: {}, side: "call",
-            sel: null, accounts: [], account: null, portfolio: null, positions: null, posIns: {}, posQ: {}, earn: {}, econ: null, tok: 0, stamp: {}, liq: {}, pick: null, userPicked: false };
+            sel: null, accounts: [], account: null, portfolio: null, positions: null, posIns: {}, posQ: {}, earn: {}, econ: null, tok: 0, stamp: {}, liq: {}, pick: null, userPicked: false, db: null, ledger: [], building: null };
 
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
@@ -387,13 +407,13 @@ if (typeof module !== "undefined") module.exports = GEX;
         S.stamp.rh = when(ev.result); showErr("err-under", ""); afterUnder();
       } else { if (DENIED[ev.error.code]) S.quotes = {}; showErr("err-under", explain(ev.error, RH)); afterUnder(); }
     }, { refetchInterval: 30000 });
-    S.mcp.watchTool(TV, "mcp-tv-get-symbol-data-batch", { symbols: TICKERS.map(function (t) { return t.tv; }), columns: ["close", "RSI", "RSI|5", "VWAP"] }, function (ev) {
+    S.mcp.watchTool(TV, "mcp-tv-get-symbol-data-batch", { symbols: TICKERS.map(function (t) { return t.tv; }), columns: ["close", "RSI", "RSI|5", "VWAP", "volume", "average_volume_10d_calc"] }, function (ev) {
       if (ev.type === "data") { S.tv = (body(ev.result) || {}); S.stamp.tv = when(ev.result); afterUnder(); }
       else { if (DENIED[ev.error.code]) S.tv = {}; showErr("err-under", explain(ev.error, TV)); afterUnder(); }
     }, { refetchInterval: 30000 });
   }
   function afterUnder() {
-    renderUnder(); renderPlan(); renderBar();
+    renderUnder(); renderPlan(); renderBar(); renderGates();
     $("src-under").textContent = underBase + (S.stamp.rh ? " Robinhood pull " + etTime(S.stamp.rh) + " ET." : "") + (S.stamp.tv ? " TradingView pull " + etTime(S.stamp.tv) + " ET." : "");
   }
 
@@ -475,15 +495,31 @@ if (typeof module !== "undefined") module.exports = GEX;
   }
 
   /* ---------- 2 dealer levels ---------- */
-  function lvlKey(sym) { return "osd:levels:" + sym + ":" + et().date; }
+  var MAP_TTL = 30 * 60000, TICK = {}; TICKERS.forEach(function (t) { TICK[t.s] = t; });
+  function lvlKey(sym) { return "osd:lv2:" + sym; }
+  function etMin() { var o = et(); return { wk: o.weekday !== "Sat" && o.weekday !== "Sun", m: (+o.hour) * 60 + (+o.minute) + (+o.second) / 60 }; }
+  function marketOpen() { var x = etMin(); return x.wk && x.m >= 570 && x.m < 960; }
+  function mapFresh(m) { if (!m || !m.asof) return false; var age = Date.now() - m.asof; return age < MAP_TTL || (!marketOpen() && !!m.closedBuild && age < 3 * 3600000); }
+  function refContracts(ins, q) {
+    var exps = Array.from(new Set(ins.map(function (i) { return i.expiration_date; }))).sort(), exp = exps.filter(function (d) { return dte(d) >= 1; })[0] || exps[0], out = {};
+    ["call", "put"].forEach(function (side) {
+      var best = null, bd = 9;
+      ins.forEach(function (i) {
+        if (i.type !== side || i.expiration_date !== exp) return;
+        var x = q[i.id], d = x && num(x.delta), sp = x && spreadPct(x); if (d == null || sp == null || sp > WIDE) return;
+        d = Math.abs(d); if (d < 0.35 || d > 0.65) return;
+        if (Math.abs(d - 0.525) < bd) { bd = Math.abs(d - 0.525); best = { exp: exp, k: num(i.strike_price), bid: num(x.bid_price), ask: num(x.ask_price), delta: num(x.delta) }; }
+      });
+      out[side] = best;
+    });
+    return out;
+  }
   function gexExpirations(dates) {
     var live = dates.filter(function (d) { return dte(d) >= 0; }).sort(), pick = live.filter(function (d) { return dte(d) <= 7; });
     live.filter(function (d) { return new Date(d + "T12:00:00Z").getUTCDay() === 5; }).slice(0, 2).forEach(function (d) { if (pick.indexOf(d) < 0) pick.push(d); });
     return pick.sort();
   }
-  function computeLevels(sym, force) {
-    var cached = !force && store.get(lvlKey(sym));
-    if (cached) { S.levels[sym] = cached; S.lvlStatus[sym] = null; renderLevels(); return Promise.resolve(); }
+  function computeLevels(sym) {
     S.lvlStatus[sym] = "reading chain…"; renderLevels();
     var spot, exps;
     return Promise.all([freshSpot(sym), getChain(sym)]).then(function (a) {
@@ -495,36 +531,111 @@ if (typeof module !== "undefined") module.exports = GEX;
       return getQuotes(ins.map(function (i) { return i.id; }), function (d, n) { S.lvlStatus[sym] = "quotes " + d + " / " + n; renderLevels(); }).then(function (q) {
         var missing = ins.filter(function (i) { return !q[i.id]; }).length;
         if (missing > ins.length * 0.02) throw { code: "server_unavailable", message: missing + " quotes missing" };
-        var asof = Date.now(), contracts = ins.filter(function (i) { return q[i.id]; }).map(function (i) {
-          var x = q[i.id];
+        var asof = Date.now(), vol = 0, oi = 0, cv = 0, pv = 0, contracts = ins.filter(function (i) { return q[i.id]; }).map(function (i) {
+          var x = q[i.id]; vol += +x.volume || 0; oi += +x.open_interest || 0; if (i.type === "call") cv += +x.volume || 0; else pv += +x.volume || 0;
           return { strike: num(i.strike_price), type: i.type, expiry: i.expiration_date, oi: x.open_interest, volume: x.volume, iv: num(x.implied_volatility), gamma: num(x.gamma) };
         });
         var m = GEX.compare({ symbol: sym, spot: spot, asof: new Date(asof).toISOString(), contracts: contracts });
         if (!m) throw { code: "tool_error", message: "no contract carried an implied volatility" };
-        m.asof = asof; m.expirations = exps;
-        S.levels[sym] = m; S.lvlStatus[sym] = null; store.set(lvlKey(sym), m); renderLevels();
+        m.asof = asof; m.expirations = exps; m.closedBuild = !marketOpen(); m.vol_oi = oi ? vol / oi : null; m.cp_vol = pv ? cv / pv : null; m.ref = refContracts(ins, q);
+        S.levels[sym] = m; S.lvlStatus[sym] = null; S.built = true; store.set(lvlKey(sym), m); renderLevels();
       });
     }).catch(function (e) { S.lvlStatus[sym] = "failed"; showErr("err-levels", sym + ": " + explain(e, RH)); renderLevels(); });
   }
   function allLevels(force) {
-    showErr("err-levels", "");
-    var order = [S.sym].concat(SYMS.filter(function (s) { return s !== S.sym; }));
-    order.forEach(function (s) { if (force || !store.get(lvlKey(s))) S.lvlStatus[s] = "queued"; });
-    renderLevels();
-    return order.reduce(function (p, s) { return p.then(function () { return computeLevels(s, force); }); }, Promise.resolve());
+    if (S.building) return S.building;
+    var order = [S.sym].concat(SYMS.filter(function (s) { return s !== S.sym; })), todo = order.filter(function (s) { return force || !mapFresh(S.levels[s]); });
+    if (!todo.length) { renderLevels(); return Promise.resolve(); }
+    showErr("err-levels", ""); S.built = false;
+    todo.forEach(function (s) { S.lvlStatus[s] = "queued"; }); renderLevels();
+    S.building = todo.reduce(function (p, s) { return p.then(function () { return computeLevels(s); }); }, Promise.resolve())
+      .then(function () { return S.built ? logRead() : null; }).catch(function () {}).then(function () { S.building = null; renderLevels(); });
+    return S.building;
   }
+
+  /* ---------- gate check ---------- */
+  function indexDir() {
+    var c = false, p = false, n = 0;
+    ["SPY", "QQQ"].forEach(function (s) {
+      var q = S.quotes[s], v = S.tv[TICK[s].tv] || {}, px = q ? num(q.last_trade_price) : null, pc = q ? num(q.adjusted_previous_close) : null, vw = num(v.VWAP);
+      if (px == null || pc == null || vw == null) return; n++; if (px > vw && px > pc) c = true; if (px < vw && px < pc) p = true;
+    });
+    return { calls: c, puts: p, n: n, text: !n ? null : c && p ? "calls and puts" : c ? "calls" : p ? "puts" : "neither" };
+  }
+  function gateRead(sym) {
+    var t = TICK[sym], v = S.tv[t.tv] || {}, m = S.levels[sym], x = etMin(), open = marketOpen(), g = [];
+    var add = function (k, label, val, pass) { g.push({ k: k, label: label, val: val, pass: pass }); };
+    add("time", "outside the 9:45 AM–3:35 PM ET entry window", open ? "open" : "closed", open && x.m >= 585 && x.m < 935);
+    var e = S.earn[sym], es = t.etf ? null : (e && !e.error ? (e.next ? sessionsTo(e.next.date) : 99) : undefined);
+    add("earnings", "earnings within 3 sessions", es, t.etf ? true : es === undefined ? null : es > 3);
+    var fr = x.wk ? Math.max(0, Math.min(1, (x.m - 570) / 390)) : 0, vol = num(v.volume), adv = num(v.average_volume_10d_calc), rv = vol != null && adv && fr > 0 ? vol / (adv * fr) : null;
+    add("volume", "volume ratio under 1.4", rv, rv == null ? null : rv >= 1.4);
+    add("map", "dealer map not built", m ? 1 : null, m ? true : null);
+    if (m) {
+      add("age", "dealer map older than 30 minutes", Math.round((Date.now() - m.asof) / 60000), mapFresh(m));
+      add("flip", "no gamma flip within ±2% of spot", m.flip_distance_pct, m.nearest_flip == null ? null : Math.abs(m.flip_distance_pct) <= 2);
+      add("drift", "map confidence (flow drift 0.15% or more)", m.drift_pct, m.drift_pct == null ? null : m.drift_pct < 0.15);
+      add("regime", "regime sign disagrees with spot versus flip", m.regime, m.nearest_flip == null ? null : (m.regime === "positive") === (m.spot > m.nearest_flip));
+    }
+    var ix = indexDir(); add("index", "SPY and QQQ back neither calls nor puts", ix.text, ix.n ? (ix.calls || ix.puts) : null);
+    if (m && !t.etf) add("vanna", "vanna not aligned in both maps", m.vanna_alignment, m.vanna_alignment === "aligned" && m.flow_vanna === "aligned");
+    var by = {}; g.forEach(function (r) { by[r.k] = r; });
+    var fail = g.filter(function (r) { return r.pass !== true; })[0] || null;
+    return { by: by, fail: fail, rv: rv, ix: ix, text: fail ? "No trade: " + fail.label + (fail.pass === null ? " (not verifiable)" : "") : "Gates clear for " + ix.text + "; setup trigger not checked; " + (t.etf ? "A" : "B, half") + " size at most" };
+  }
+  function renderGates() {
+    var cell = function (r, txt) { return r ? '<td class="' + (r.pass === true ? "up" : r.pass === false ? "down" : "muted") + '">' + (r.pass === null ? "n/a" : txt) + "</td>" : '<td class="muted">—</td>'; };
+    $("gate-body").innerHTML = SYMS.map(function (s) {
+      var r = gateRead(s), b = r.by, m = S.levels[s], q = S.quotes[s], px = q ? num(q.last_trade_price) : null, pc = q ? num(q.adjusted_previous_close) : null, mv = px != null && pc ? (px - pc) / pc * 100 : null;
+      return '<tr class="' + (s === S.sym ? "sel" : "") + '"><td class="t"><b>' + s + '</b></td><td class="t" style="white-space:normal;min-width:220px;text-align:left">' + (r.fail ? '<span class="chip">no trade</span> ' : '<span class="chip pos">gates clear</span> ') + esc(r.text.replace(/^No trade: /, "")) + "</td>" +
+        cell(b.volume, f(r.rv)) + (TICK[s].etf ? '<td class="muted">fund</td>' : cell(b.earnings, b.earnings.val === 99 ? "none listed" : b.earnings.val + " sessions")) +
+        cell(b.flip, m ? pct(m.flip_distance_pct) : "") + cell(b.drift, m && m.drift_pct != null ? f(m.drift_pct) + "%" : "") + cell(b.regime, b.regime && b.regime.pass ? "agrees" : "disagrees") +
+        cell(b.index, esc(r.ix.text)) + (TICK[s].etf ? '<td class="muted">not required</td>' : cell(b.vanna, b.vanna && b.vanna.pass ? "aligned" : "not aligned")) +
+        '<td class="t">' + (m ? (m.regime === "positive" ? "+GEX" : "−GEX") + " · " : "") + pct(mv) + "</td><td>" + (m && m.vol_oi != null ? f(m.vol_oi, 1) + "×" : "—") + "</td>" + cell(b.age, b.age ? b.age.val + " min" : "") + "</tr>";
+    }).join("");
+    var cur = gateRead(S.sym); $("gateline").innerHTML = "<b>" + esc(S.sym) + "</b>: " + esc(cur.text) + ".";
+  }
+
+  /* ---------- desk log ---------- */
+  function logRead() {
+    if (!S.db) return Promise.resolve();
+    var o = et(), refTxt = function (c) { return c ? { exp: c.exp, strike: c.k, bid: c.bid, ask: c.ask, delta: c.delta } : null; };
+    var doc = { ts: Date.now(), date: o.date, time: o.hour + ":" + o.minute, rows: SYMS.map(function (s) {
+      var m = S.levels[s], r = gateRead(s);
+      return { sym: s, verdict: r.text, spot: m ? m.spot : null, flip: m ? m.nearest_flip : null, king: m ? m.king_node : null, call_wall: m ? m.call_wall : null, put_wall: m ? m.put_wall : null,
+        regime: m ? m.regime : null, drift: m ? m.drift_pct : null, rvol: r.rv == null ? null : Math.round(r.rv * 100) / 100, map_at: m ? m.asof : null, ref_call: refTxt(m && m.ref && m.ref.call), ref_put: refTxt(m && m.ref && m.ref.put) };
+    }) };
+    return S.db.collection("ledger").doc(o.date + "_" + o.hour + o.minute + o.second).set(doc).then(function () { S.ledger.unshift(doc); S.ledger = S.ledger.slice(0, 8); showErr("err-ledger", ""); renderLedger(); },
+      function (e) { showErr("err-ledger", "This read was not saved to the log (" + ((e && e.code) || "unknown error") + ")."); });
+  }
+  function loadLedger() {
+    if (!S.db) return;
+    $("p-ledger").hidden = false; renderLedger();
+    S.db.collection("ledger").orderBy("ts", "desc").limit(8).get().then(function (snap) { S.ledger = snap.docs.map(function (d) { return d.data(); }).filter(Boolean); renderLedger(); },
+      function (e) { showErr("err-ledger", "The log could not be read (" + ((e && e.code) || "unknown error") + ")."); });
+  }
+  function renderLedger() {
+    var ref = function (c) { return c ? esc(c.exp) + " " + f(c.strike, c.strike % 1 ? 1 : 0) + " · " + f(c.bid) + " / " + f(c.ask) : "—"; };
+    $("ledger-count").textContent = S.ledger.length ? S.ledger.length + (S.ledger.length >= 8 ? "+" : "") + " recent reads saved" : "";
+    $("ledger-body").innerHTML = S.ledger.length ? S.ledger.slice(0, 2).map(function (d) {
+      return (d.rows || []).map(function (r) {
+        return "<tr><td>" + esc(d.date) + " " + esc(d.time) + '</td><td class="t"><b>' + esc(r.sym) + '</b></td><td class="t" style="white-space:normal;min-width:200px;text-align:left">' + esc(r.verdict) + "</td><td>" + f(r.spot) + "</td><td>" + f(r.flip) + "</td><td>" + (r.king == null ? "—" : f(r.king, r.king % 1 ? 1 : 0)) + "</td><td>" + f(r.rvol) + "</td><td>" + ref(r.ref_call) + "</td><td>" + ref(r.ref_put) + "</td></tr>";
+      }).join("");
+    }).join("") : '<tr><td colspan="9" class="t muted">No reads logged yet. The first one is saved after the next levels rebuild.</td></tr>';
+  }
+
   function renderLevels() {
     $("lvl-body").innerHTML = SYMS.map(function (s) {
       var m = S.levels[s], st = S.lvlStatus[s];
       if (!m) return '<tr><td class="t"><b>' + s + '</b></td><td colspan="9" class="t muted' + (st && st !== "failed" ? " loading" : "") + '">' + esc(st || (S.mcp ? "waiting" : "needs live connectors")) + "</td></tr>";
-      var conf = m.confidence === "stable" ? '<span class="chip pos">stable</span>' : m.confidence === "contested" ? '<span class="chip warn">contested</span>' : '<span class="chip">n/a</span>';
+      var conf = m.confidence === "stable" ? '<span class="chip pos">stable</span>' : m.confidence === "contested" ? '<span class="chip warn">contested</span>' : '<span class="chip">not established</span>';
       return '<tr class="' + (s === S.sym ? "sel" : "") + '"><td class="t"><b>' + s + "</b>" + (st ? ' <span class="muted loading">' + esc(st) + "</span>" : "") + "</td><td>" + f(m.spot) + "</td><td>" +
-        (m.nearest_flip == null ? '<span class="muted">none within ±6%</span>' : f(m.nearest_flip)) + '</td><td class="' + cls(m.flip_distance_pct) + '">' + pct(m.flip_distance_pct) + "</td><td>" +
+        (m.nearest_flip == null ? '<span class="muted">none in loaded strikes</span>' : f(m.nearest_flip)) + '</td><td class="' + cls(m.flip_distance_pct) + '">' + pct(m.flip_distance_pct) + "</td><td>" +
         (m.call_wall == null ? "—" : f(m.call_wall, m.call_wall % 1 ? 1 : 0)) + "</td><td>" + (m.put_wall == null ? "—" : f(m.put_wall, m.put_wall % 1 ? 1 : 0)) + '</td><td class="t">' +
         (m.regime === "positive" ? '<span class="chip pos">+GEX damped</span>' : '<span class="chip neg">−GEX amplified</span>') + '</td><td class="t">' + conf +
-        (m.drift_pct != null ? ' <span class="muted num">' + f(m.drift_pct) + "%</span>" : "") + "</td><td>" + m.contracts + "</td><td>" + etTime(m.asof, false) + "</td></tr>";
+        (m.drift_pct != null ? ' <span class="muted num">' + f(m.drift_pct) + "%</span>" : "") + "</td><td>" + m.contracts + "</td><td>" + etTime(m.asof, false) + (mapFresh(m) ? "" : ' <span class="chip warn">stale</span>') + "</td></tr>";
     }).join("");
-    renderBar();
+    renderBar(); renderGates();
   }
   function renderBar() {
     var m = S.levels[S.sym], bar = $("bar"), px = last(S.sym);
@@ -670,7 +781,7 @@ if (typeof module !== "undefined") module.exports = GEX;
         var rows = body(r); rows = Array.isArray(rows) ? rows.filter(function (x) { return x && x.symbol === t.s && x.date; }) : [];
         var next = rows.filter(function (x) { return x.date >= today; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; })[0];
         var prev = rows.filter(function (x) { return x.date < today; }).sort(function (a, b) { return a.date < b.date ? 1 : -1; })[0];
-        S.earn[t.s] = { next: next, prev: prev }; stamp("src-earn", earnBase, when(r)); renderEarn(); if (S.pick) rankLiq();
+        S.earn[t.s] = { next: next, prev: prev }; stamp("src-earn", earnBase, when(r)); renderEarn(); if (S.pick) rankLiq(); renderGates();
       }).catch(function (e) { S.earn[t.s] = { error: true }; showErr("err-earn", explain(e, FMP)); renderEarn(); });
     });
     call(TV, "mcp-tv-get-economic-calendar", { countries: "US", min_importance: 1, date_from: today, date_to: today + "T23:59:59Z" }, { cache: { staleTime: 900000, gcTime: 3600000 } }).then(function (r) {
@@ -718,21 +829,23 @@ if (typeof module !== "undefined") module.exports = GEX;
     S.mcp.invalidate(RH, "get_equity_quotes").catch(function () {}); S.mcp.invalidate(TV, "mcp-tv-get-symbol-data-batch").catch(function () {});
     if (S.rows.length) refreshPicker(); else loadChain();
     loadPositions(); loadEvents(); scanAll();
-    SYMS.forEach(function (s) { if (S.lvlStatus[s] === "failed") S.lvlStatus[s] = null; });
-    if (SYMS.some(function (s) { return !S.levels[s] && !S.lvlStatus[s]; })) allLevels(false);
+    allLevels(false);
   });
-  $("recompute").addEventListener("click", function () { if (S.mcp && !SYMS.some(function (s) { var x = S.lvlStatus[s]; return x && x !== "failed"; })) allLevels(true); });
+  $("recompute").addEventListener("click", function () { if (S.mcp) allLevels(true); });
 
   function start() {
+    SYMS.forEach(function (s) { var c = store.get(lvlKey(s)); if (c && c.asof && c.spot) S.levels[s] = c; });
     renderUnder(); renderLevels(); renderPicker(); renderEarn(); renderEcon(); tick(); setInterval(tick, 1000);
     var use = window.claude && window.claude.use;
     if (!use) return offline();
+    window.claude.use("db").then(function (d) { S.db = d || null; loadLedger(); }, function () {});
     Promise.all([window.claude.use("mcp"), window.claude.use("permissions")]).then(function (a) {
       S.mcp = a[0]; if (!S.mcp) return offline();
       var ask = a[1] ? a[1].request(["mcp"]).catch(function () {}) : Promise.resolve();
       return ask.then(function () {
         watchUnder(); loadChain(); loadAccounts(); loadEvents(); scanAll().then(function () { return allLevels(false); });
         setInterval(function () { if (document.visibilityState === "visible") scanAll(); }, 120000);
+        setInterval(function () { renderGates(); if (document.visibilityState === "visible" && marketOpen()) allLevels(false); }, 60000);
         setInterval(function () { if (document.visibilityState === "visible") { refreshPicker(); loadPositions(); } }, 30000);
       });
     });
