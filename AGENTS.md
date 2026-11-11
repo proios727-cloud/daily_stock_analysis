@@ -47,8 +47,8 @@
 - `CLAUDE.md` 必须是指向 `AGENTS.md` 的软链接，用于兼容 Claude 生态。
 - `.github/copilot-instructions.md` 与 `.github/instructions/*.instructions.md` 是 GitHub Copilot / Coding Agent 的镜像或分层补充；若与本文件冲突，以 `AGENTS.md` 为准。
 - 仓库协作 skill 存放在 `.claude/skills/`，分析产物存放在 `.claude/reviews/`；前者可以入库，后者默认视为本地产物。
-- 仓库共享的 Claude Code 项目设置存放在 `.claude/settings.json`（会话默认模型与 advisor 模型），子 agent 定义存放在 `.claude/agents/`；二者可以入库，`.claude/` 下其余内容仍视为本地产物。
-- 模型分层以“够用即可”为原则：主会话负责规划、高风险区域的语义判断与最终交付；`scout`（轻量模型）负责只读检索与取证；`implementer`（中档模型）负责范围已明确的常规实现与验证；`reviewer`（沿用主会话模型）负责高风险改动合入前的独立审查；`brain`（最高档模型、高 effort）只读、不写代码，仅在方案锁定前、同一错误重复出现、宣布完成前这三个决策点被调用；`opus-checker`（高档模型）只读，在 `/brain` 流程的构建步骤之后对照方案与完成标准独立检查构建产物；`sonnet-checker`（中档模型）只读，负责把交付物中的数值与结论对照新鲜数据源或实际命令输出逐项核对。需要逐字复制的数据拉取（如期权链映射）使用中档模型，不降到轻量模型。几次工具调用即可完成的小任务由主会话直接处理，不为委派而委派。
+- 仓库共享的 Claude Code 项目设置存放在 `.claude/settings.json`（会话默认模型、advisor 模型与子 agent 默认模型），子 agent 定义存放在 `.claude/agents/`；二者可以入库，`.claude/` 下其余内容仍视为本地产物。
+- 模型分层以“够用即可”为原则：主会话负责规划、高风险区域的语义判断与最终交付；`scout`（轻量模型）负责只读检索与取证；`implementer`（中档模型）负责范围已明确的常规实现与验证；`reviewer`（沿用主会话模型）负责高风险改动合入前的独立审查；`brain`（最高档模型、高 effort）只读、不写代码，仅在方案锁定前、同一错误重复出现、宣布完成前这三个决策点被调用；`opus-checker`（高档模型）只读，在 `/brain` 流程的构建步骤之后对照方案与完成标准独立检查构建产物；`sonnet-checker`（中档模型）只读，负责把交付物中的数值与结论对照新鲜数据源或实际命令输出逐项核对。需要逐字复制的数据拉取（如期权链映射）交给 `map-builder`（中档模型），不降到轻量模型。未在 frontmatter 声明模型的子 agent（含内置通用 / 检索类 agent）默认使用轻量模型，由 `.claude/settings.json` 的 `env.CLAUDE_CODE_SUBAGENT_MODEL` 设定；需要更高档位时在调用时指定模型或改用已声明模型的 agent。几次工具调用即可完成的小任务由主会话直接处理，不为委派而委派。
 - 会话默认使用中档模型处理日常编码、审查与检查；只有规划、架构、根因分析或超出单次会话的大任务才切换到最高档模型（例如通过 `/brain` 编排 skill 调用 `brain` agent，或 `/model`）；`.claude/settings.json` 中的 `advisorModel` 为实验性能力（已在云端会话中观察到 advisor 生效，不支持该能力的会话行为未验证）。
 - 主会话在三个时点主动咨询 advisor（未挂载 advisor 时改为调用 `brain` agent）：方案锁定前、同一错误重复出现时、宣布完成前；其余时间不调用最高档模型。
 - 子 agent 的模型在各自 frontmatter 中用别名声明（`haiku` / `sonnet` / `opus` / `fable` / `inherit`），`effort` 同样只在 frontmatter 声明，不写具体版本号；调整分层时只改对应 agent 文件与本节说明。
