@@ -52,6 +52,7 @@
 - 会话默认使用中档模型处理日常编码、审查与检查；只有规划、架构、根因分析或超出单次会话的大任务才切换到最高档模型（例如通过 `/brain` 编排 skill 调用 `brain` agent，或 `/model`）；`.claude/settings.json` 中的 `advisorModel` 为实验性能力（已在云端会话中观察到 advisor 生效，不支持该能力的会话行为未验证）。
 - 主会话在三个时点主动咨询 advisor（未挂载 advisor 时改为调用 `brain` agent）：方案锁定前、同一错误重复出现时、宣布完成前；其余时间不调用最高档模型。
 - 子 agent 的模型在各自 frontmatter 中用别名声明（`haiku` / `sonnet` / `opus` / `fable` / `inherit`），`effort` 同样只在 frontmatter 声明，不写具体版本号；调整分层时只改对应 agent 文件与本节说明。
+- `plugins/brain/` 与根目录 `.claude-plugin/marketplace.json` 是 `/brain` 编排 skill 及其子 agent 的可移植通用版（不依赖本仓库 `AGENTS.md`，供其他仓库 / 会话以 Claude Code plugin 方式安装），不是本仓库协作规则真源；修改 `.claude/skills/brain/` 或 `.claude/agents/` 中的 brain 相关内容时，需评估 `plugins/brain/` 是否同步，未同步需在交付说明中写明原因。
 - 根目录 `SKILL.md` 与 `docs/openclaw-skill-integration.md` 属于产品或外部集成说明，不是仓库协作规则真源。
 - 若未来新增 `.agents/skills/` 或其他 agent 专用目录，必须先明确单一真源，再通过脚本或镜像同步；禁止手工长期维护多份同义内容。
 - 修改 AI 协作治理资产时，执行：

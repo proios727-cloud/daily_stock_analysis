@@ -1,0 +1,15 @@
+{
+  "name": "brain-desk",
+  "description": "Private marketplace for the brain plan-first orchestration plugin.",
+  "owner": {
+    "name": "brain-plugin"
+  },
+  "plugins": [
+    {
+      "name": "brain",
+      "source": "./plugins/brain",
+      "description": "Plan-first orchestration: spend the top-tier model only at decision points and delegate search, build, checking and verification to cheaper agents.",
+      "version": "1.0.0"
+    }
+  ]
+}

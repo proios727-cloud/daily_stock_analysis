@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] Telegram 推送按 UTF-16 长度判断与分段，修复含大量 emoji 的报告超出 4096 限制导致发送失败的问题。
 - [chore] 新增 `/brain` 编排 skill 与只读子 agent `brain`（最高档模型、高 effort，仅用于决策点）、`opus-checker`（构建后检查）、`sonnet-checker`（数值核对），并在 `.claude/settings.json` 声明实验性 `advisorModel`。
 - [chore] 子 agent 默认模型设为轻量档（`env.CLAUDE_CODE_SUBAGENT_MODEL`），新增中档 `map-builder` 负责需逐字复制的数据拉取。
+- [chore] 新增可移植的 `/brain` Claude Code plugin（`plugins/brain/` + 根目录 `.claude-plugin/marketplace.json`，marketplace 名 `brain-desk`）：skill 与 7 个子 agent 不再依赖本仓库 `AGENTS.md`，可在其他仓库 / 会话中安装；AGENTS.md 第 2 节补充其与 `.claude/skills/brain` 的同步约定。
 
 ## [3.33.0] - 2026-10-15
 
