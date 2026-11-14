@@ -37,6 +37,21 @@ Models and effort are set in each agent's frontmatter under `.claude/agents/`, n
 6. Check and verify. Run the checks for the changed area from `AGENTS.md` section 6. Have `opus-checker` judge any build larger than a few lines against the plan. Where the deliverable shows data, have `sonnet-checker` compare it against fresh source calls. Use `reviewer` for high-risk changes.
 7. Deliver in the structure from `AGENTS.md` section 9, including what was not verified.
 
+## Verify models
+
+Run this on the first `/brain` use in a session, and again after changing any agent's `model` or `.claude/settings.json`. An agent's own answer about its model is not evidence; use the recorded model in its transcript.
+
+1. Spawn `brain` with a no-op brief (for example "reply: ready, do not read files").
+2. Read the model the transcript recorded for it:
+
+   ```bash
+   grep -o '"model":"[^"]*"' ~/.claude/projects/<project>/<session>/subagents/agent-<id>.jsonl | sort | uniq -c
+   ```
+
+3. Compare against the frontmatter alias in `.claude/agents/brain.md` (`fable`). A different model means the alias did not resolve or an override applied: stop and report it instead of continuing to use `brain`.
+4. When an advisor is attached, call it once and confirm it reports the model set in `advisorModel`. Until confirmed, treat the advisor as unverified and use `brain` for the three decision points.
+5. Main-session and child-session models are visible through `get_session` (`session_context.model`, `external_metadata.last_served_model`).
+
 ## Boundaries
 
 - Sub-agents do not run `git commit`, `git push` or `git tag`; the main session decides, under the rules in `AGENTS.md` section 1.
