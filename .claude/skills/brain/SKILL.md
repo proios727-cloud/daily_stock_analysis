@@ -39,17 +39,17 @@ Models and effort are set in each agent's frontmatter under `.claude/agents/`, n
 
 ## Verify models
 
-Run this on the first `/brain` use in a session, and again after changing any agent's `model` or `.claude/settings.json`. An agent's own answer about its model is not evidence; use the recorded model in its transcript.
+Run this on the first `/brain` use in a session, and again after changing any agent's `model` or `.claude/settings.json`. An agent's own answer about its model is not evidence; use the model recorded in the transcript.
 
-1. Spawn `brain` with a no-op brief (for example "reply: ready, do not read files").
-2. Read the model the transcript recorded for it:
+1. Spawn `brain` with a no-op brief (for example "reply: ready, do not read files"). This smoke test is the one use of the top tier outside the three decision points; it is cheap and is not repeated within a session.
+2. Read the model recorded in the subagent transcript:
 
    ```bash
    grep -o '"model":"[^"]*"' ~/.claude/projects/<project>/<session>/subagents/agent-<id>.jsonl | sort | uniq -c
    ```
 
 3. Compare against the frontmatter alias in `.claude/agents/brain.md` (`fable`). A different model means the alias did not resolve or an override applied: stop and report it instead of continuing to use `brain`.
-4. When an advisor is attached, call it once and confirm it reports the model set in `advisorModel`. Until confirmed, treat the advisor as unverified and use `brain` for the three decision points.
+4. Advisor: its model is recorded in the main session transcript (`~/.claude/projects/<project>/<session>.jsonl`), not in its reply. After an advisor call, find the assistant entry whose `usage.iterations` contains `"type": "advisor_message"` and read that iteration's `model`; compare it with `advisorModel`. If no such entry exists, the advisor is not attached or not recorded: treat it as unverified.
 5. Main-session and child-session models are visible through `get_session` (`session_context.model`, `external_metadata.last_served_model`).
 
 ## Boundaries
