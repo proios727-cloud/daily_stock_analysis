@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [chore] 新增 `/brain` 编排 skill 与只读子 agent `brain`（最高档模型、高 effort，仅用于决策点）、`opus-checker`（构建后检查）、`sonnet-checker`（数值核对），并在 `.claude/settings.json` 声明实验性 `advisorModel`。
 - [chore] 子 agent 默认模型设为轻量档（`env.CLAUDE_CODE_SUBAGENT_MODEL`），新增中档 `map-builder` 负责需逐字复制的数据拉取。
 - [chore] 新增可移植的 `/brain` Claude Code plugin（`plugins/brain/` + 根目录 `.claude-plugin/marketplace.json`，marketplace 名 `brain-desk`）：skill 与 7 个子 agent 不再依赖本仓库 `AGENTS.md`，可在其他仓库 / 会话中安装；AGENTS.md 第 2 节补充其与 `.claude/skills/brain` 的同步约定。
+- [chore] 新增可移植的 `/kickoff` Claude Code plugin（`plugins/kickoff/`，加入根目录 marketplace `brain-desk`）：动手前把想法整理为可评审的 `KICKOFF.md`（目标、非目标、不变量、任务拆解、验证计划、未验证项、可粘贴的 agent 交接提示），仅一次最高档决策，批准前不写代码。
 
 ## [3.33.0] - 2026-10-15
 
