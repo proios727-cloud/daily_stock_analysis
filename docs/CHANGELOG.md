@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [chore] 新增可移植的 `/brain` Claude Code plugin（`plugins/brain/` + 根目录 `.claude-plugin/marketplace.json`，marketplace 名 `brain-desk`）：skill 与 7 个子 agent 不再依赖本仓库 `AGENTS.md`，可在其他仓库 / 会话中安装；AGENTS.md 第 2 节补充其与 `.claude/skills/brain` 的同步约定。
 - [chore] 新增可移植的 `/kickoff` Claude Code plugin（`plugins/kickoff/`，加入根目录 marketplace `brain-desk`）：动手前把想法整理为可评审的 `KICKOFF.md`（目标、非目标、不变量、任务拆解、验证计划、未验证项、可粘贴的 agent 交接提示），仅一次最高档决策，批准前不写代码。
 - [chore] `/kickoff` plugin 升至 1.1.0：KICKOFF.md 模板新增任务 Owner 列与「Your checklist」（仅用户可做的事项），并要求把依赖用户环境的能力标为 `depends` 并给出核对步骤。
+- [chore] 新增可移植的 `/premarket-brief` plugin（`plugins/premarket-brief/`，加入 marketplace `brain-desk`）：针对中性观察列表的只读盘前简报（来源、时间戳、已核对 / 未核对分列，不下单、不读取持仓），并附 dev chores runbook 指向现有 skill。
 
 ## [3.33.0] - 2026-10-15
 

@@ -1,0 +1,6 @@
+{
+  "name": "premarket-brief",
+  "version": "1.0.0",
+  "description": "Read-only pre-market brief for a neutral watchlist: prior close, pre-market move, news and earnings dates per ticker, with sources, timestamps and a verified / not-verified split. Analysis only; never places orders or reads holdings.",
+  "keywords": ["markets", "brief", "watchlist", "read-only", "workflow"]
+}
