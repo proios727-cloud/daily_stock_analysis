@@ -37,6 +37,8 @@ If the repository has `AGENTS.md`, `CLAUDE.md` or an equivalent rules file, read
 - **Verified and unverified are separate lists.** No task is "ready" without a stated check and its evidence.
 - **No outward actions without explicit approval:** publishing, deploying, sending messages, spending, trading, deleting.
 - **Tiers by alias only:** light, mid, top. Do not write model version numbers into the brief; they go stale.
+- **Tasks only the user can do** (supplying a sample, running something in their own app, confirming a decision) go under Your checklist, not in handoff prompts.
+- **A capability the user says "depends" stays an open item with a check step.** Never record it as confirmed.
 - **Small ideas stay small.** If the whole thing is a few tool calls, say so, skip the ceremony, and do it or hand it back.
 
 ## Cowork and agent handoff

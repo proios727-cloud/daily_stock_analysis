@@ -15,7 +15,7 @@
       "name": "kickoff",
       "source": "./plugins/kickoff",
       "description": "Brainstorm-before-coding: turns an idea into a reviewable KICKOFF.md with one top-tier decision and paste-ready agent handoffs, then stops for approval.",
-      "version": "1.0.0"
+      "version": "1.1.0"
     }
   ]
 }

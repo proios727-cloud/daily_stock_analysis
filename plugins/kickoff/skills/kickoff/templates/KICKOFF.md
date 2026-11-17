@@ -30,15 +30,16 @@ Chosen approach and why, in a short paragraph.
 | Do not build: use or buy existing | | |
 
 ## Task breakdown
-| # | Task | Tier (light/mid/top) | Inputs | Output file | Acceptance test |
-| --- | --- | --- | --- | --- | --- |
-| 1 | | | | | |
+| # | Task | Owner (agent/you) | Tier (agents only: light/mid/top) | Inputs | Output file | Acceptance test |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | | | | | | |
 
 ## Verification plan
 For each task, who checks it (a different agent than the builder), against what (spec, invariants, fresh data or command output), and what evidence is recorded.
 
 ## Honest limits and unverified items
 Things the design depends on that were not seen or tested (real data samples, accounts, APIs, platform behaviour). Plain list.
+Capabilities that depend on the user's setup (for example whether Cowork loads plugins or runs sub-agents): mark `depends` and give the check step.
 -
 
 ## Risks and kill criteria
@@ -49,7 +50,14 @@ Top 3 risks, each with a signal that says stop or change course.
 Decisions the user must make before building.
 -
 
+## Your checklist
+Tasks only you can do. One line each.
+| # | What to do | What to bring back | Blocks build? (yes/no) |
+| --- | --- | --- | --- |
+| 1 | | | |
+
 ## Handoff prompts (paste-ready, self-contained)
+Agent tasks only.
 One block per task. A fresh session with no memory of this conversation must be able to run it.
 
 ### Task 1: <name> (tier: <light|mid|top>)
