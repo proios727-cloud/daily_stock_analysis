@@ -1,0 +1,6 @@
+{
+  "name": "brain",
+  "version": "1.0.0",
+  "description": "Plan-first orchestration: the top-tier model is used only at decision points (plan lock, repeated error, pre-done review); search, build, checking and verification go to cheaper agents.",
+  "keywords": ["orchestration", "agents", "planning", "review", "verification"]
+}

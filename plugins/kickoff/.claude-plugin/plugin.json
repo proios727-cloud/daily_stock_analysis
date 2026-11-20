@@ -1,0 +1,12 @@
+{
+  "name": "kickoff",
+  "version": "1.1.0",
+  "description": "Brainstorm-before-coding: turns an idea into a reviewable KICKOFF.md (goal, non-goals, invariants, task breakdown, verification plan, honest limits, paste-ready agent handoffs) with one top-tier decision, then stops for approval. No code is written.",
+  "keywords": [
+    "planning",
+    "brainstorm",
+    "kickoff",
+    "spec",
+    "handoff"
+  ]
+}

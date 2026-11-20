@@ -1,0 +1,27 @@
+{
+  "name": "brain-desk",
+  "description": "Private marketplace for plan-first orchestration (brain), brainstorm-before-coding (kickoff) and a read-only pre-market brief.",
+  "owner": {
+    "name": "brain-plugin"
+  },
+  "plugins": [
+    {
+      "name": "brain",
+      "source": "./plugins/brain",
+      "description": "Plan-first orchestration: spend the top-tier model only at decision points and delegate search, build, checking and verification to cheaper agents.",
+      "version": "1.0.0"
+    },
+    {
+      "name": "kickoff",
+      "source": "./plugins/kickoff",
+      "description": "Brainstorm-before-coding: turns an idea into a reviewable KICKOFF.md with one top-tier decision and paste-ready agent handoffs, then stops for approval.",
+      "version": "1.1.0"
+    },
+    {
+      "name": "premarket-brief",
+      "source": "./plugins/premarket-brief",
+      "description": "Read-only pre-market brief for a neutral watchlist, with sources, timestamps and a verified / not-verified split. Analysis only.",
+      "version": "1.0.1"
+    }
+  ]
+}
