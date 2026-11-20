@@ -29,17 +29,18 @@ Default list (neutral, not tied to anyone's book): SPY, QQQ, IWM, DIA, AAPL, MSF
 ## Steps
 
 1. **Clock.** State the current time in US Eastern and the session state: pre-open (04:00-09:30 ET on a trading day), open, after hours, or closed (weekend or holiday). If the tools cannot tell a holiday, say so.
-2. **Sources.** List the quote and news tools this session has, including any you choose not to use. Label each with exactly one of `free`, `billed` or `unknown`. Ask before any `billed` call. For `unknown`, ask unless the user has already said that tool costs nothing. If no quote tool exists, stop and say what is missing; do not answer from memory.
-3. **Per ticker.** Pull: prior regular-session close; the latest pre-market or extended-hours price if the source has one, otherwise the last trade; percent change against the prior close; the next earnings date if within 7 days; one line of notable news if a news tool is available. Record the source and the data timestamp for each number.
+2. **Sources.** List the quote and news sources this session has, by provider (one entry per provider and data type, not per tool), including any you choose not to use. Label each with exactly one of `free`, `billed` or `unknown`. Ask before any `billed` call. For `unknown`, ask unless the user has already said that tool costs nothing. If no quote tool exists, stop and say what is missing; do not answer from memory.
+3. **Per ticker.** Pull: prior regular-session close; the latest pre-market or extended-hours price if the source has one, otherwise the last trade; percent change against the prior close; the next earnings date if within 7 days; one line of notable news if a news tool is available. Record the source and the data timestamp for each number. If a data call returns later than the stated as-of time (for example it hangs and returns after the open), say when it returned.
 4. **Index read.** Two or three lines on SPY, QQQ, IWM and DIA together: direction, size of move, breadth across the four.
 5. **What to watch.** Up to five items, each stated as a condition and what it would indicate ("if X holds above Y, it indicates Z"). No buy, sell, hold, size or target wording.
-6. **Self-check.** If sub-agents are available, give a separate checker the table and have it re-pull every number. Otherwise re-pull three tickers yourself and report any drift. Numbers not re-pulled go under Not verified.
+6. **Self-check.** If sub-agents are available, give a separate checker the table and have it re-pull every number. Otherwise re-pull three tickers yourself and report any drift. Numbers not re-pulled go under Not verified. The Verified section states the results itself; it never just points to another file.
 
 ## Output format
 
 ```markdown
 # Pre-market brief: <date>, as of <HH:MM ET> (<session state>)
-Sources: <tool> (free|billed|unknown) ...
+Sources: <provider and data type> (free|billed|unknown); ...
+<optional one-line notes: holiday check, price definitions, rounding, late-returning calls>
 
 | Ticker | Prior close | Latest | Change | Latest as of | Earnings <=7d | Note |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -57,6 +58,8 @@ Draft, analysis only. Not investment advice. Prices can be stale or wrong; check
 - No table cell is left blank. If news was not pulled, the Note cell says "news: not pulled".
 - Describe only what was pulled. No statements about volume, liquidity or sentiment unless that data is in the brief with a source.
 - If two sources disagree (for example an earnings calendar that shows a result while the quote clock says the report is still ahead), state the conflict under Not verified; do not pick one.
+- The Earnings cell holds only what the calendar returned. Anything known from elsewhere (a headline, an earlier pull) goes under Not verified.
+- A quoted headline may be shortened but not reworded; give provider and time.
 - Percent change is computed from the two prices shown, so the reader can check it.
 - If the user supplies a list, use exactly that list. Do not add tickers from any account.
 - Do not send, post or schedule the brief anywhere unless the user asks in the same conversation.
