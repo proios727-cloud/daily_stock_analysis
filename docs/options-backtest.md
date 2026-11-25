@@ -11,7 +11,7 @@ python -m src.options --symbols SPY,QQQ,NVDA --start 2024-01-01 --end 2025-06-30
   --selection-params '{"target_dte":30,"otm_pct":0.02}'
 ```
 
-Add `--json` for every trade plus the summary. Output is a per-ticker table: trades, win rate, expectancy (mean net premium return per trade, and $ per contract), profit factor, max drawdown ($, one contract, cumulative), average days held, and the count of each exit reason.
+Add `--picks picks.json` (from `python -m src.options.pick`) to trade the picker's ranked tickers with its DTE window, liquidity floors and delta band; see [options-picker.md](options-picker.md). Add `--json` for every trade plus the summary. Output is a per-ticker table: trades, win rate, expectancy (mean net premium return per trade, and $ per contract), profit factor, max drawdown ($, one contract, cumulative), average days held, and the count of each exit reason.
 
 From code (also the hook for walk-forward harnesses):
 
@@ -32,7 +32,7 @@ Underlying daily bars come from the existing `DataFetcherManager`. A provider fa
 
 ## Entry
 
-Signal on day *t* close, entry at day *t+1* closing **ask** (no look-ahead). Contract: expiry closest to `target_dte` inside `[min_dte, max_dte]`, strike closest to spot × (1 ± `otm_pct`) or to `target_delta` when the provider returns deltas (Alpha Vantage does, ThetaData EOD does not). Liquidity filter: `min_bid`, `max_spread_pct`. One open position per ticker; signals while in a trade are skipped.
+Signal on day *t* close, entry at day *t+1* closing **ask** (no look-ahead). Contract: expiry closest to `target_dte` inside `[min_dte, max_dte]`, strike closest to spot × (1 ± `otm_pct`) or to `target_delta` (provider deltas when present, as from Alpha Vantage; otherwise Black-Scholes delta from the closing mid, as for ThetaData EOD). Liquidity filter: `min_bid`, `max_spread_pct`. One open position per ticker; signals while in a trade are skipped.
 
 Mechanical triggers (the YAML strategies are LLM instructions, so these are readings of their core rule):
 

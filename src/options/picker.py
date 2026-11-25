@@ -365,3 +365,26 @@ def flat_contract_rows(ranks: List[TickerRank], as_of: date) -> List[dict]:
             row.update(asdict(c))
             rows.append(row)
     return rows
+
+
+def selection_from_picks(payload: dict) -> tuple:
+    """Turn a picker payload into (ranked symbols, SelectionParams overrides) for the backtester.
+
+    Symbols keep the picker's order and skip unranked tickers. The overrides
+    carry the picker's DTE window, liquidity floors and the middle of its delta
+    band as ``target_delta``.
+    """
+    if payload.get("schema") != OUTPUT_SCHEMA_VERSION:
+        raise ValueError(f"not an {OUTPUT_SCHEMA_VERSION} file: schema={payload.get('schema')!r}")
+    cfg = payload.get("config", {})
+    symbols = [t["symbol"] for t in sorted(payload.get("tickers", []), key=lambda t: t.get("rank", 0))
+               if t.get("rank", 0) > 0]
+    overrides = {
+        "min_dte": cfg["dte_min"],
+        "max_dte": cfg["dte_max"],
+        "target_dte": cfg["target_dte"],
+        "target_delta": round((cfg["delta_min"] + cfg["delta_max"]) / 2, 4),
+        "min_bid": cfg["min_bid"],
+        "max_spread_pct": cfg["max_rel_spread"],
+    }
+    return symbols, overrides

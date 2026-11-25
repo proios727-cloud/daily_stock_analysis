@@ -27,6 +27,23 @@ python -m src.options.pick --symbols SPY,QQQ,NVDA --delta-min 0.45 --delta-max 0
 Output: `options_picks.json` (schema `options_picker.v1`) and `options_picks.csv`
 beside it, plus a console table.
 
+## Use in the backtester
+
+```bash
+python -m src.options.pick --date 2026-11-23 --out picks.json
+python -m src.options --picks picks.json --start 2025-01-01 --end 2026-11-20
+```
+
+`--picks` trades the file's ranked tickers (rank > 0, in rank order; with
+`--symbols` it keeps only the listed ones) and sets the selection to the
+picker's window: `min_dte`/`max_dte`/`target_dte` from `dte_min`/`dte_max`/
+`target_dte`, `target_delta` = middle of the delta band, `min_bid`, and
+`max_spread_pct` = `max_rel_spread`. Explicit `--selection-params` override
+these. On each signal day the backtester re-selects a contract from that day's
+chain, choosing the one closest to `target_delta` (so it is not held strictly
+inside the band). The specific contracts in the file are a snapshot for that
+date and are not replayed.
+
 ## How it ranks
 
 1. Per underlying, read the EOD chain out to `dte_max + 1` days and the last

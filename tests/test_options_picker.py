@@ -140,3 +140,57 @@ def test_cli_end_to_end_on_snapshot(tmp_path):
     assert top["iv_rank_source"] == "hv_proxy"
     assert any("BBB" in e for e in payload["errors"])
     assert (tmp_path / "picks.csv").exists()
+
+
+# --- backtester wiring (--picks) -------------------------------------------
+
+def _payload_for(symbols_ranks):
+    cfg = PickerConfig()
+    ranks = rank_universe({s: _chain(s, 100, 0.3, 0.02 if r else 0.5, 500 if r else 1) for s, r in symbols_ranks},
+                          {s: 100.0 for s, _ in symbols_ranks}, AS_OF, cfg)
+    return to_payload(ranks, AS_OF, cfg, {"chain": "test"})
+
+
+def test_selection_from_picks_maps_band_and_ranked_symbols():
+    from src.options.models import SelectionParams
+    from src.options.picker import selection_from_picks
+
+    symbols, overrides = selection_from_picks(_payload_for([("AAA", True), ("THIN", False)]))
+    assert symbols == ["AAA"]
+    sel = SelectionParams.from_dict(overrides)
+    assert (sel.min_dte, sel.max_dte, sel.target_dte, sel.target_delta) == (14, 42, 28, 0.5)
+    assert sel.max_spread_pct == 0.10 and sel.min_bid == 0.10
+    with pytest.raises(ValueError):
+        selection_from_picks({"schema": "other"})
+
+
+def test_select_contract_uses_bs_delta_when_source_has_none():
+    from src.options.backtest import select_contract
+    from src.options.models import SelectionParams
+
+    chain = _chain("AAA", 100, 0.3, 0.02, 500, strikes_pct=(-0.10, -0.05, 0, 0.05, 0.10))
+    assert all(q.delta is None for q in chain)
+    near_atm = select_contract(chain, AS_OF, 100.0, "call", SelectionParams(min_dte=14, max_dte=42, target_delta=0.5))
+    assert near_atm.contract.strike == 100.0
+    otm = select_contract(chain, AS_OF, 100.0, "call", SelectionParams(min_dte=14, max_dte=42, target_delta=0.25))
+    assert otm.contract.strike > 100.0
+
+
+def test_backtest_cli_reads_picks_file(tmp_path, monkeypatch):
+    import src.options.__main__ as cli
+
+    picks = tmp_path / "picks.json"
+    picks.write_text(json.dumps(_payload_for([("AAA", True), ("BBB", True), ("THIN", False)])))
+    seen = []
+    monkeypatch.setattr(cli, "default_provider", lambda: object())
+    monkeypatch.setattr(cli, "_load_bars", lambda sym, start, end: sym)
+    monkeypatch.setattr(cli, "run_backtest", lambda sym, bars, prov, sig, sel, ex, s, e: seen.append((sym, sel)) or [])
+
+    assert cli.main(["--picks", str(picks), "--start", "2026-01-01", "--end", "2026-06-30",
+                     "--selection-params", '{"max_dte": 35}']) == 0
+    assert [s for s, _ in seen] == ["AAA", "BBB"]
+    assert seen[0][1].target_delta == 0.5 and seen[0][1].max_dte == 35 and seen[0][1].min_dte == 14
+
+    seen.clear()
+    assert cli.main(["--picks", str(picks), "--symbols", "BBB,ZZZ", "--start", "2026-01-01", "--end", "2026-06-30"]) == 0
+    assert [s for s, _ in seen] == ["BBB"]

@@ -10,6 +10,7 @@ from datetime import date
 
 from .backtest import run_backtest
 from .models import ExitParams, SelectionParams
+from .picker import selection_from_picks
 from .providers import default_provider
 from .report import summarize_trades, to_markdown
 
@@ -25,7 +26,9 @@ def _load_bars(symbol: str, start: str, end: str):
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Long single-leg option premium backtest")
-    ap.add_argument("--symbols", required=True, help="comma separated US tickers")
+    ap.add_argument("--symbols", help="comma separated US tickers (required unless --picks is given)")
+    ap.add_argument("--picks", help="options_picker.v1 JSON from `python -m src.options.pick`: trade its ranked "
+                                    "tickers with its DTE window, liquidity floors and delta band")
     ap.add_argument("--start", required=True)
     ap.add_argument("--end", required=True)
     ap.add_argument("--signal", default="ma_golden_cross")
@@ -35,14 +38,23 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     exits = ExitParams.from_dict(json.loads(args.exit_params))
-    sel = SelectionParams.from_dict(json.loads(args.selection_params))
+    symbols = [s.strip().upper() for s in (args.symbols or "").split(",") if s.strip()]
+    sel_params = json.loads(args.selection_params)
+    if args.picks:
+        with open(args.picks, encoding="utf-8") as fh:
+            pick_symbols, pick_sel = selection_from_picks(json.load(fh))
+        symbols = [s for s in pick_symbols if s in symbols] if symbols else pick_symbols
+        sel_params = {**pick_sel, **sel_params}  # explicit --selection-params still win
+    if not symbols:
+        ap.error("no symbols: pass --symbols or a --picks file with ranked tickers")
+    sel = SelectionParams.from_dict(sel_params)
     provider = default_provider()
     start, end = date.fromisoformat(args.start), date.fromisoformat(args.end)
     # 60 extra days of bars so moving averages are warm at `start`.
     warm = date.fromordinal(start.toordinal() - 60).isoformat()
 
     trades = []
-    for sym in [s.strip().upper() for s in args.symbols.split(",") if s.strip()]:
+    for sym in symbols:
         try:
             bars = _load_bars(sym, warm, args.end)
             trades += run_backtest(sym, bars, provider, args.signal, sel, exits, start, end)

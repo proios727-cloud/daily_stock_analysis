@@ -93,7 +93,7 @@ class SelectionParams:
     min_dte: int = 21
     max_dte: int = 45
     otm_pct: float = 0.02          # strike ~2% out of the money; ignored when target_delta is set
-    target_delta: Optional[float] = None  # e.g. 0.40; used only when the provider returns deltas
+    target_delta: Optional[float] = None  # e.g. 0.40; Black-Scholes from mid when the provider has no deltas
     min_bid: float = 0.20
     max_spread_pct: float = 0.10   # (ask - bid) / mid
     allow_puts: bool = True

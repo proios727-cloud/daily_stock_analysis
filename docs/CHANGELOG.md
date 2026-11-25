@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [chore] 新增 `/brain` 编排 skill 与只读子 agent `brain`（最高档模型、高 effort，仅用于决策点）、`opus-checker`（构建后检查）、`sonnet-checker`（数值核对），并在 `.claude/settings.json` 声明实验性 `advisorModel`。
 - [新功能] 新增 `src/options/` 单腿买入期权权利金回测（`python -m src.options`）：以 `strategies/*.yaml` 的机械化信号入场，按 EOD 买价/卖价成交，支持硬止损、追踪止损与锁盈地板、到期/DTE 退出，按标的输出胜率、期望、最大回撤；数据源 ThetaData 优先、Alpha Vantage 兜底，详见 `docs/options-backtest.md`。
 - [chore] 子 agent 默认模型设为轻量档（`env.CLAUDE_CODE_SUBAGENT_MODEL`），新增中档 `map-builder` 负责需逐字复制的数据拉取。
-- [新功能] 新增只读美股期权链选股器 `python -m src.options.pick`：复用 `src/options` 数据源，按买卖价差、成交量、持仓量与 IV Rank 给标的打分，挑选 0.40–0.60 Delta、14–42 天到期的单腿合约，输出供期权回测使用的 JSON/CSV（见 `docs/options-picker.md`）。
+- [新功能] 新增只读美股期权链选股器 `python -m src.options.pick`：复用 `src/options` 数据源，按买卖价差、成交量、持仓量与 IV Rank 给标的打分，挑选 0.40–0.60 Delta、14–42 天到期的单腿合约，输出 JSON/CSV；回测可通过 `python -m src.options --picks <file>` 读取其排名标的、DTE 窗口与 Delta 中值选约（ThetaData 无 Greeks 时按中间价 Black-Scholes 估算 Delta），详见 `docs/options-picker.md`。
 
 ## [3.33.0] - 2026-10-15
 

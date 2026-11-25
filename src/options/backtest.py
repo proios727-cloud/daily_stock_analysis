@@ -12,6 +12,7 @@ import pandas as pd
 
 from .exits import evaluate_exit
 from .models import CONTRACT_MULTIPLIER, ExitParams, OptionQuote, OptionTrade, SelectionParams
+from .picker import PickerConfig, bs_delta, implied_vol
 from .providers import OptionDataProvider
 from .signals import get_signal
 
@@ -19,6 +20,14 @@ logger = logging.getLogger(__name__)
 
 _EXIT_KEYS = {f.name for f in fields(ExitParams)}
 _SELECT_KEYS = {f.name for f in fields(SelectionParams)}
+
+
+def _mid_delta(q: OptionQuote, day: date, spot: float) -> Optional[float]:
+    """Black-Scholes delta from the mid, for EOD sources without greeks (same model as the picker)."""
+    t = (q.contract.expiration - day).days / 365.0
+    rate = PickerConfig().risk_free_rate
+    iv = implied_vol(q.mid, spot, q.contract.strike, t, rate, q.contract.right)
+    return bs_delta(spot, q.contract.strike, t, rate, iv, q.contract.right) if iv is not None else None
 
 
 def select_contract(
@@ -37,8 +46,10 @@ def select_contract(
         return None
     best_exp = min({q.contract.expiration for q in pool}, key=lambda e: abs((e - day).days - sel.target_dte))
     pool = [q for q in pool if q.contract.expiration == best_exp]
-    if sel.target_delta is not None and all(q.delta is not None for q in pool):
-        return min(pool, key=lambda q: abs(abs(q.delta) - sel.target_delta))
+    if sel.target_delta is not None:
+        deltas = {id(q): q.delta if q.delta is not None else _mid_delta(q, day, spot) for q in pool}
+        if all(d is not None for d in deltas.values()):
+            return min(pool, key=lambda q: abs(abs(deltas[id(q)]) - sel.target_delta))
     target = spot * (1 + sel.otm_pct) if right == "call" else spot * (1 - sel.otm_pct)
     return min(pool, key=lambda q: abs(q.contract.strike - target))
 
