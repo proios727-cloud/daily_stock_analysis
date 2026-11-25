@@ -50,6 +50,7 @@
 | [个股研究聚合 API](stock-profile-api.md) | 单一 stock-profile 契约、分块质量状态、代码归一与后续 Web 边界 |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
 | [ETF 轮动](etf-rotation.md) | `--etf-rotation` 规则化双动量轮动：规则、配置、报告章节、参数平原解读与数据告警边界 |
+| [期权链选股器](options-picker.md) | `python -m src.options.pick` 只读美股期权标的排名与 0.40–0.60 Delta、2–6 周合约挑选，输出供期权回测使用 |
 | [ResearchArtifact 结构化研究产物](research-artifact.md) | structured_report 字段、Thesis / Evidence / Invalidation / Next Action / Data Quality 契约和旧报告兼容边界 |
 | [组合风险与暴露看板](portfolio-risk-exposure-dashboard.md) | 持仓页风险旗标、市场暴露、币种暴露和价格质量聚合展示 |
 | [选股解释契约](screening-explanations.md) | Why Selected / Why Now 的后端确定性解释、来源、质量状态与缺失值边界 |
