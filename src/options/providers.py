@@ -168,6 +168,37 @@ class AlphaVantageOptionsProvider:
         return out
 
 
+# --------------------------------------------------------------------------- snapshot
+class ThetaSnapshotProvider:
+    """Replays saved ThetaData option EOD JSON from ``<dir>/<SYMBOL>_options.json``.
+
+    For chains pulled outside the Theta Terminal (for example through the
+    ThetaData connector) so the picker and backtester can run offline.
+    """
+
+    name = "thetadata-snapshot"
+
+    def __init__(self, directory: str):
+        self.directory = directory
+
+    def _load(self, symbol: str) -> List[OptionQuote]:
+        import json
+
+        path = os.path.join(self.directory, f"{symbol.upper()}_options.json")
+        if not os.path.exists(path):
+            raise FileNotFoundError(path)
+        with open(path, encoding="utf-8") as fh:
+            return parse_theta_eod(json.load(fh))
+
+    def chain(self, symbol: str, day: date, right: str, max_dte: int) -> List[OptionQuote]:
+        limit = day + timedelta(days=max_dte)
+        return [q for q in self._load(symbol)
+                if q.day == day and q.contract.right == right and q.contract.expiration <= limit]
+
+    def history(self, contract: OptionContract, start: date, end: date) -> List[OptionQuote]:
+        return [q for q in self._load(contract.symbol) if q.contract == contract and start <= q.day <= end]
+
+
 # --------------------------------------------------------------------------- fallback
 class FallbackProvider:
     """Try providers in order; a failure or an empty result moves to the next."""
