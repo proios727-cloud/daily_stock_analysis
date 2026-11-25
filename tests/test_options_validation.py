@@ -71,3 +71,22 @@ def test_thin_oos_sample_is_insufficient_not_overfit():
         return [{"entry_date": start, "exit_date": start, "return_pct": -0.1}]
     rep = walk_forward(sparse, GRID, START, END, min_train_trades=1)
     assert rep.verdict == "INSUFFICIENT_DATA"
+
+
+def test_lottery_edge_is_flagged_not_significant():
+    """Mostly small losers plus rare huge winners: positive mean, not significant."""
+    def lottery(params, start, end):
+        out = []
+        for d in _days(start, end, every=7):
+            rng = random.Random(hash((d, params["trail"])))
+            r = 4.0 if rng.random() < 0.04 else -0.12
+            out.append({"entry_date": d, "exit_date": d, "return_pct": r})
+        return out
+    rep = walk_forward(lottery, GRID, START, END, train_days=365, test_days=90)
+    assert rep.verdict != "ROBUST"
+
+
+def test_tstat_and_median():
+    s = compute_stats([{"return_pct": r} for r in (0.1, 0.2, 0.3, -0.1)])
+    assert abs(s.median_return - 0.15) < 1e-9
+    assert s.tstat > 0

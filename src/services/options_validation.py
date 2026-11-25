@@ -30,6 +30,7 @@ MIN_OOS_TRADES = 30
 MIN_EFFICIENCY = 0.5          # OOS score / in-sample score
 MIN_PROFITABLE_FOLD_SHARE = 0.6
 MIN_NEIGHBOR_SHARE = 0.6      # share of parameter neighbours that stay profitable
+MIN_OOS_TSTAT = 2.0           # t-stat of mean OOS return per trade (roughly 95% one-sided)
 
 
 def _get(trade: Trade, key: str) -> Any:
@@ -47,6 +48,8 @@ class TradeStats:
     profit_factor: float
     total_return: float
     max_drawdown: float
+    tstat: float = 0.0
+    median_return: float = 0.0
 
     @property
     def score(self) -> float:
@@ -71,6 +74,12 @@ def compute_stats(trades: Sequence[Trade]) -> TradeStats:
         peak = max(peak, equity)
         mdd = max(mdd, peak - equity)
     mean = sum(rets) / n
+    srt = sorted(rets)
+    median = srt[n // 2] if n % 2 else (srt[n // 2 - 1] + srt[n // 2]) / 2
+    tstat = 0.0
+    if n > 1:
+        sd = math.sqrt(sum((r - mean) ** 2 for r in rets) / (n - 1))
+        tstat = mean / (sd / math.sqrt(n)) if sd > 0 else (math.inf if mean > 0 else 0.0)
     return TradeStats(
         trades=n,
         win_rate=len(wins) / n,
@@ -79,6 +88,8 @@ def compute_stats(trades: Sequence[Trade]) -> TradeStats:
         profit_factor=pf,
         total_return=sum(rets),
         max_drawdown=mdd,
+        tstat=tstat,
+        median_return=median,
     )
 
 
@@ -122,6 +133,7 @@ class ValidationReport:
             f"- Walk-forward folds: {len(self.folds)}, profitable OOS folds: {self.profitable_fold_share:.0%}",
             f"- OOS trades: {o.trades}, win rate {o.win_rate:.0%}, expectancy {o.expectancy:+.1%}/trade, "
             f"PF {o.profit_factor:.2f}, max DD {o.max_drawdown:.1%}",
+            f"- OOS t-stat {o.tstat:.2f}, median trade {o.median_return:+.1%}",
             f"- Walk-forward efficiency (OOS/IS expectancy): {self.efficiency:.2f}",
         ]
         if self.neighbor_share is not None:
@@ -255,6 +267,9 @@ def _verdict(folds, oos, efficiency, prof_share, neighbor_share, holdout):
         reasons.append("Pooled OOS expectancy is not positive.")
     if efficiency < MIN_EFFICIENCY:
         reasons.append(f"Walk-forward efficiency {efficiency:.2f} < {MIN_EFFICIENCY}: in-sample edge mostly disappears OOS.")
+    if oos.tstat < MIN_OOS_TSTAT:
+        reasons.append(f"OOS mean is not statistically significant (t={oos.tstat:.2f} < {MIN_OOS_TSTAT}); "
+                       "the edge may come from a few outsized winners.")
     if prof_share < MIN_PROFITABLE_FOLD_SHARE:
         reasons.append(f"Only {prof_share:.0%} of OOS folds profitable (< {MIN_PROFITABLE_FOLD_SHARE:.0%}).")
     if neighbor_share is not None and neighbor_share < MIN_NEIGHBOR_SHARE:

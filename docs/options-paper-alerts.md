@@ -23,7 +23,7 @@ run(params: dict, start: date, end: date) -> list[trade]
 
 - OOS 交易数 < 30 → `INSUFFICIENT_DATA`（样本太少，不判定过拟合）
 - 合并 OOS 期望为负，或最终留出期亏损 → `OVERFIT`
-- walk-forward 效率（OOS/IS 期望）< 0.5、盈利折数 < 60%、相邻参数盈利占比 < 60% 任一命中 → `FRAGILE`
+- 合并 OOS 每笔收益均值 t 值 < 2（不显著，可能来自少数极端盈利单）、walk-forward 效率（OOS/IS 期望）< 0.5、盈利折数 < 60%、相邻参数盈利占比 < 60% 任一命中 → `FRAGILE`
 - 以上均未命中 → `ROBUST`
 
 ## 退出规则（按权利金计算）
