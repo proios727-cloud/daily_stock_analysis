@@ -162,9 +162,10 @@ def test_parse_theta_eod_shape():
 def test_parse_av_chain_shape():
     payload = {"data": [{"contractID": "SPY250221C00600000", "symbol": "SPY", "expiration": "2025-02-21",
                          "strike": "600.00", "type": "call", "bid": "11.74", "ask": "11.80", "delta": "0.52",
-                         "volume": "10", "date": "2025-01-21"}]}
+                         "volume": "10", "open_interest": "250", "implied_volatility": "0.18", "date": "2025-01-21"}]}
     q = parse_av_chain(payload, date(2025, 1, 21))
     assert q[0].contract == C and q[0].delta == pytest.approx(0.52)
+    assert q[0].open_interest == 250 and q[0].iv == pytest.approx(0.18)
 
 
 def test_fallback_provider_moves_on():

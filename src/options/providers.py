@@ -120,9 +120,10 @@ def parse_av_chain(payload: Dict[str, Any], day: date) -> List[OptionQuote]:
             strike=float(row.get("strike")),
             right=str(row.get("type", "")).lower(),
         )
-        vol = _f(row.get("volume"))
+        vol, oi = _f(row.get("volume")), _f(row.get("open_interest"))
         quotes.append(OptionQuote(contract, _to_date(row.get("date") or day), bid, ask,
-                                  int(vol) if vol is not None else None, _f(row.get("delta"))))
+                                  int(vol) if vol is not None else None, _f(row.get("delta")),
+                                  int(oi) if oi is not None else None, _f(row.get("implied_volatility"))))
     return quotes
 
 

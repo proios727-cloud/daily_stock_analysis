@@ -32,6 +32,8 @@ class OptionQuote:
     ask: float
     volume: Optional[int] = None
     delta: Optional[float] = None
+    open_interest: Optional[int] = None
+    iv: Optional[float] = None
 
     @property
     def mid(self) -> float:
