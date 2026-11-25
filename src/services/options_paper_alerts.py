@@ -1,33 +1,35 @@
 # -*- coding: utf-8 -*-
 """Paper-only entry / exit alerts for long options premium positions.
 
-Tracks a paper position per contract and, on each new premium mark, decides
-whether a stop has been hit. Alerts go through the existing
-``NotificationService`` on the ``alert`` route. No orders are ever placed.
+Tracks a paper position per contract and, on each new end-of-day premium mark,
+applies exactly the backtester's exit rules (``src.options.exits.stop_level``
+with ``src.options.models.ExitParams``), so live alerts fire at the levels the
+backtest measured. Alerts go through the existing ``NotificationService`` on
+the ``alert`` route. No orders are ever placed.
 
-Exit rules (all measured on option premium, not the underlying):
+Per mark, in the backtester's order:
 
-* Hard stop:   exit if mark <= entry * (1 - stop_loss_pct).
-* Trailing:    once armed (gain >= trail_activation_pct), exit if mark <= peak * (1 - trail_pct).
-* Profit lock: once gain >= lock_trigger_pct, a floor at entry * (1 + lock_floor_pct)
-               is set and never removed; exit if mark <= floor.
+1. peak = max(peak, mark)
+2. take_profit (if set): exit if mark >= entry * (1 + take_profit_pct)
+3. stop: exit if mark <= stop_level(entry, peak) — the highest of the hard stop,
+   the trailing stop (armed at trail_activation_pct) and the profit-lock floor
+   (armed at lock_trigger_pct)
+4. dte_exit when the expiry is known, then max_hold
 
-The effective stop is the highest of the active levels, so the profit lock is a
-guard rail under the trailing stop: the trail chases the peak for max return,
-the lock guarantees a minimum banked gain once reached.
-
-Default percentages are first-version guesses (marked GUESS); the backtester
-and walk-forward validation should replace them.
+Default exit levels are the backtester's unvalidated starting guesses.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from dataclasses import asdict, dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from src.options.exits import stop_level
+from src.options.models import ExitParams
 
 logger = logging.getLogger(__name__)
 
@@ -35,29 +37,13 @@ PAPER_TAG = "PAPER ONLY, no order placed"
 
 
 @dataclass
-class ExitRules:
-    stop_loss_pct: float = 0.35      # GUESS
-    trail_pct: float = 0.25          # GUESS
-    trail_activation_pct: float = 0.20      # GUESS: trail only after +20%
-    lock_trigger_pct: float = 0.50   # GUESS
-    lock_floor_pct: float = 0.30     # GUESS, matches backtester default
-
-    def __post_init__(self) -> None:
-        for name in ("stop_loss_pct", "trail_pct"):
-            v = getattr(self, name)
-            if not 0 < v < 1:
-                raise ValueError(f"{name} must be in (0, 1), got {v}")
-        if self.lock_floor_pct >= self.lock_trigger_pct:
-            raise ValueError("lock_floor_pct must be below lock_trigger_pct")
-
-
-@dataclass
 class PaperPosition:
     contract: str                    # e.g. "AAPL 2026-12-19 C 200"
     underlying: str
     entry_premium: float
-    entry_time: str
-    rules: ExitRules = field(default_factory=ExitRules)
+    entry_date: str                  # ISO date
+    params: ExitParams
+    expiration: Optional[str] = None  # ISO date; enables dte_exit when set
     peak_premium: float = 0.0
     last_premium: float = 0.0
     lock_armed: bool = False
@@ -65,12 +51,13 @@ class PaperPosition:
     closed: bool = False
     exit_reason: Optional[str] = None
     exit_premium: Optional[float] = None
-    exit_time: Optional[str] = None
+    exit_date: Optional[str] = None
     note: str = ""
 
     def __post_init__(self) -> None:
         if self.entry_premium <= 0:
             raise ValueError("entry_premium must be positive")
+        self.params.validate()
         self.peak_premium = self.peak_premium or self.entry_premium
         self.last_premium = self.last_premium or self.entry_premium
 
@@ -78,18 +65,9 @@ class PaperPosition:
     def gain_pct(self) -> float:
         return self.last_premium / self.entry_premium - 1
 
-    def stop_levels(self) -> Dict[str, float]:
-        r = self.rules
-        levels = {"hard_stop": self.entry_premium * (1 - r.stop_loss_pct)}
-        if self.trail_armed:
-            levels["trailing_stop"] = self.peak_premium * (1 - r.trail_pct)
-        if self.lock_armed:
-            levels["profit_lock"] = self.entry_premium * (1 + r.lock_floor_pct)
-        return levels
-
     def active_stop(self) -> tuple[str, float]:
-        name, level = max(self.stop_levels().items(), key=lambda kv: kv[1])
-        return name, level
+        level, rule = stop_level(self.entry_premium, self.peak_premium, self.params)
+        return rule, level
 
 
 @dataclass
@@ -102,66 +80,75 @@ class AlertEvent:
     exit_reason: Optional[str] = None
 
 
-def update_position(pos: PaperPosition, mark: float, now: Optional[str] = None) -> List[AlertEvent]:
-    """Apply a new premium mark. Returns the alert events it produced."""
+def _key(pos: PaperPosition, suffix: str) -> str:
+    return f"opt-paper:{pos.contract}:{pos.entry_date}:{suffix}"
+
+
+def _close(pos: PaperPosition, mark: float, day: date, reason: str, detail: str) -> AlertEvent:
+    pos.closed, pos.exit_reason, pos.exit_premium, pos.exit_date = True, reason, mark, day.isoformat()
+    full = (f"{detail}; entry {pos.entry_premium:.2f}, peak {pos.peak_premium:.2f}, "
+            f"P/L at mark {pos.gain_pct:+.1%} (fill at bid may be lower)")
+    return AlertEvent("EXIT", pos.contract, mark, full, _key(pos, "exit"), exit_reason=reason)
+
+
+def update_position(pos: PaperPosition, mark: float, day: Optional[date] = None) -> List[AlertEvent]:
+    """Apply one end-of-day premium mark (mid). Returns the alert events it produced."""
     if pos.closed or mark is None or mark <= 0:
         return []
-    now = now or datetime.now().isoformat(timespec="seconds")
-    events: List[AlertEvent] = []
-    r = pos.rules
-
-    # Check the stop that was in force before this mark (no look-ahead on the peak).
-    stop_name, stop_level = pos.active_stop()
-    if mark <= stop_level:
-        pos.last_premium = mark
-        pos.closed, pos.exit_reason, pos.exit_premium, pos.exit_time = True, stop_name, mark, now
-        events.append(AlertEvent(
-            kind="EXIT",
-            contract=pos.contract,
-            premium=mark,
-            detail=(f"{stop_name.replace('_', ' ')} hit at {mark:.2f} (level {stop_level:.2f}); "
-                    f"entry {pos.entry_premium:.2f}, peak {pos.peak_premium:.2f}, P/L {pos.gain_pct:+.1%}"),
-            dedup_key=f"opt-paper:{pos.contract}:{pos.entry_time}:exit",
-            exit_reason=stop_name,
-        ))
-        return events
-
+    day = day or date.today()
+    if day <= date.fromisoformat(pos.entry_date):
+        return []  # backtester ignores quotes on or before the entry day
+    p = pos.params
     pos.last_premium = mark
     pos.peak_premium = max(pos.peak_premium, mark)
-    peak_gain = pos.peak_premium / pos.entry_premium - 1
+    entry = pos.entry_premium
 
-    if not pos.trail_armed and peak_gain >= r.trail_activation_pct:
+    if p.take_profit_pct is not None and mark >= entry * (1 + p.take_profit_pct):
+        return [_close(pos, mark, day, "take_profit", f"take profit hit at {mark:.2f}")]
+    level, rule = stop_level(entry, pos.peak_premium, p)
+    if mark <= level:
+        return [_close(pos, mark, day, rule, f"{rule.replace('_', ' ')} hit at {mark:.2f} (level {level:.2f})")]
+    if pos.expiration and (date.fromisoformat(pos.expiration) - day).days <= p.exit_dte:
+        return [_close(pos, mark, day, "dte_exit", f"{p.exit_dte} days to expiry, closing at {mark:.2f}")]
+    if (day - date.fromisoformat(pos.entry_date)).days >= p.max_hold_days:
+        return [_close(pos, mark, day, "max_hold", f"held {p.max_hold_days} days, closing at {mark:.2f}")]
+
+    events: List[AlertEvent] = []
+    peak_gain = pos.peak_premium / entry - 1
+    if not pos.trail_armed and peak_gain >= p.trail_activation_pct:
         pos.trail_armed = True
         events.append(AlertEvent(
             "TRAIL_ARMED", pos.contract, mark,
-            f"Gain {peak_gain:+.1%}: trailing stop {r.trail_pct:.0%} below peak now active "
-            f"(level {pos.peak_premium * (1 - r.trail_pct):.2f})",
-            f"opt-paper:{pos.contract}:{pos.entry_time}:trail",
+            f"Gain {peak_gain:+.1%}: trailing stop {p.trail_pct:.0%} below peak now active "
+            f"(level {pos.peak_premium * (1 - p.trail_pct):.2f})",
+            _key(pos, "trail"),
         ))
-    if not pos.lock_armed and peak_gain >= r.lock_trigger_pct:
+    if not pos.lock_armed and peak_gain >= p.lock_trigger_pct:
         pos.lock_armed = True
         events.append(AlertEvent(
             "LOCK_ARMED", pos.contract, mark,
-            f"Gain {peak_gain:+.1%}: profit lock floor set at {pos.entry_premium * (1 + r.lock_floor_pct):.2f} "
-            f"(+{r.lock_floor_pct:.0%} banked minimum)",
-            f"opt-paper:{pos.contract}:{pos.entry_time}:lock",
+            f"Gain {peak_gain:+.1%}: profit lock floor set at {entry * (1 + p.lock_floor_pct):.2f} "
+            f"(+{p.lock_floor_pct:.0%} minimum at the mark)",
+            _key(pos, "lock"),
         ))
     return events
 
 
-def open_position(contract: str, underlying: str, entry_premium: float, rules: Optional[ExitRules] = None,
-                  note: str = "", now: Optional[str] = None) -> tuple[PaperPosition, AlertEvent]:
-    now = now or datetime.now().isoformat(timespec="seconds")
+def open_position(contract: str, underlying: str, entry_premium: float, params: Optional[ExitParams] = None,
+                  note: str = "", day: Optional[date] = None,
+                  expiration: Optional[date] = None) -> tuple[PaperPosition, AlertEvent]:
+    day = day or date.today()
+    p = params or ExitParams()
     pos = PaperPosition(contract=contract, underlying=underlying, entry_premium=entry_premium,
-                        entry_time=now, rules=rules or ExitRules(), note=note)
-    hs = pos.stop_levels()["hard_stop"]
-    r = pos.rules
-    detail = (f"Paper buy at {entry_premium:.2f}. Hard stop {hs:.2f} (-{r.stop_loss_pct:.0%}), "
-              f"trail {r.trail_pct:.0%} after +{r.trail_activation_pct:.0%}, "
-              f"profit lock +{r.lock_floor_pct:.0%} after +{r.lock_trigger_pct:.0%}")
+                        entry_date=day.isoformat(), params=p, note=note,
+                        expiration=expiration.isoformat() if expiration else None)
+    hs = entry_premium * (1 - p.stop_loss_pct)
+    detail = (f"Paper buy at {entry_premium:.2f}. Hard stop {hs:.2f} (-{p.stop_loss_pct:.0%}), "
+              f"trail {p.trail_pct:.0%} after +{p.trail_activation_pct:.0%}, "
+              f"profit lock +{p.lock_floor_pct:.0%} after +{p.lock_trigger_pct:.0%}")
     if note:
         detail += f". Signal: {note}"
-    return pos, AlertEvent("ENTRY", contract, entry_premium, detail, f"opt-paper:{contract}:{now}:entry")
+    return pos, AlertEvent("ENTRY", contract, entry_premium, detail, _key(pos, "entry"))
 
 
 def format_alert(event: AlertEvent) -> tuple[str, str, str]:
@@ -173,7 +160,7 @@ def format_alert(event: AlertEvent) -> tuple[str, str, str]:
         "EXIT": ("Options exit", "warning"),
     }
     label, alert_type = titles.get(event.kind, (event.kind, "info"))
-    if event.kind == "EXIT" and event.exit_reason == "profit_lock":
+    if event.kind == "EXIT" and event.exit_reason in {"profit_lock", "take_profit"}:
         alert_type = "success"
     body = f"`{event.contract}` @ {event.premium:.2f}\n\n{event.detail}\n\n_{PAPER_TAG}_"
     return f"{label} | {event.contract}", body, alert_type
@@ -193,8 +180,8 @@ class OptionsPaperAlerter:
     def _load(self) -> None:
         raw = json.loads(self.state_path.read_text(encoding="utf-8"))
         for item in raw.get("positions", []):
-            rules = ExitRules(**item.pop("rules"))
-            pos = PaperPosition(rules=rules, **item)
+            params = ExitParams.from_dict(item.pop("params"))
+            pos = PaperPosition(params=params, **item)
             self.positions[pos.contract] = pos
 
     def save(self) -> None:
@@ -206,24 +193,25 @@ class OptionsPaperAlerter:
 
     # -- actions ---------------------------------------------------------
     def enter(self, contract: str, underlying: str, entry_premium: float,
-              rules: Optional[ExitRules] = None, note: str = "") -> Optional[AlertEvent]:
+              params: Optional[ExitParams] = None, note: str = "", day: Optional[date] = None,
+              expiration: Optional[date] = None) -> Optional[AlertEvent]:
         existing = self.positions.get(contract)
         if existing and not existing.closed:
             logger.info("[OptionsPaper] %s already open, entry ignored", contract)
             return None
-        pos, event = open_position(contract, underlying, entry_premium, rules, note)
+        pos, event = open_position(contract, underlying, entry_premium, params, note, day, expiration)
         self.positions[contract] = pos
         self._dispatch(event)
         self.save()
         return event
 
-    def mark(self, marks: Dict[str, float]) -> List[AlertEvent]:
+    def mark(self, marks: Dict[str, float], day: Optional[date] = None) -> List[AlertEvent]:
         events: List[AlertEvent] = []
         for contract, premium in marks.items():
             pos = self.positions.get(contract)
             if pos is None:
                 continue
-            events.extend(update_position(pos, premium))
+            events.extend(update_position(pos, premium, day))
         for ev in events:
             self._dispatch(ev)
         self.save()
@@ -235,11 +223,19 @@ class OptionsPaperAlerter:
     def _dispatch(self, event: AlertEvent) -> bool:
         """Send one alert. A failed channel never breaks position tracking."""
         try:
-            from src.notification import NotificationBuilder, NotificationService
-
-            notifier = self._notifier or NotificationService()
             title, body, alert_type = format_alert(event)
-            text = NotificationBuilder.build_simple_alert(title=title, content=body, alert_type=alert_type)
+            if self._notifier is not None:
+                notifier, text = self._notifier, f"{title}\n\n{body}"
+                try:
+                    from src.notification import NotificationBuilder
+                    text = NotificationBuilder.build_simple_alert(title=title, content=body, alert_type=alert_type)
+                except ImportError:
+                    pass
+            else:
+                from src.notification import NotificationBuilder, NotificationService
+
+                notifier = NotificationService()
+                text = NotificationBuilder.build_simple_alert(title=title, content=body, alert_type=alert_type)
             result = notifier.send_with_results(text, route_type="alert", dedup_key=event.dedup_key)
             return bool(getattr(result, "success", result))
         except Exception as exc:  # noqa: BLE001 - notification must not stop tracking

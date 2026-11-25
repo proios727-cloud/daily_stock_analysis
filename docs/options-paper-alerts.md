@@ -32,18 +32,22 @@ run(params: dict, start: date, end: date) -> list[trade]
 - 移动止损：浮盈达到 `trail_activation_pct` 后启用，`mark <= peak * (1 - trail_pct)` 退出
 - 利润锁定：浮盈达到 `lock_trigger_pct` 后设置不可撤销的地板价 `entry * (1 + lock_floor_pct)`
 - 生效止损取三者最高，即移动止损追逐峰值，利润锁定保证最低落袋收益
-- 止损判断使用上一根标记前的止损位，避免用同一标记的新高推高止损（无前视）
+- 止损计算直接调用回测器的 `src.options.exits.stop_level` 与 `src.options.models.ExitParams`，与回测逐笔一致（先用当日标记更新峰值，再判断止盈 / 止损 / DTE / 最长持有）；`tests/test_options_paper_alerts.py` 用 200 条随机权利金路径校验与 `evaluate_exit` 的退出原因与日期一致
+- 告警按当日收盘中间价判断，实际以买价成交可能更差
 
-默认值 `stop_loss_pct=0.35`、`trail_pct=0.25`、`trail_activation_pct=0.20`、`lock_trigger_pct=0.50`、`lock_floor_pct=0.30` 为首版猜测值，应以校验通过的参数替换。
+默认值 `stop_loss_pct=0.35`、`trail_pct=0.25`、`trail_activation_pct=0.20`、`lock_trigger_pct=0.50`、`lock_floor_pct=0.30` 为回测器默认的首版猜测值，应以校验通过的参数替换。
 
 ## 使用示例
 
 ```python
-from src.services.options_paper_alerts import OptionsPaperAlerter, ExitRules
+from datetime import date
+from src.options.models import ExitParams
+from src.services.options_paper_alerts import OptionsPaperAlerter
 
 alerter = OptionsPaperAlerter(state_path="data/options_paper_positions.json")
-alerter.enter("AAPL 2026-12-19 C 200", "AAPL", 4.10, ExitRules(), note="ma_golden_cross")
-alerter.mark({"AAPL 2026-12-19 C 200": 6.40})  # 触发移动止损/利润锁定启用告警
+alerter.enter("AAPL 2026-12-19 C 200", "AAPL", 4.10, ExitParams(), note="volume_breakout",
+              expiration=date(2026, 12, 19))
+alerter.mark({"AAPL 2026-12-19 C 200": 6.40}, day=date(2026, 11, 26))  # 触发移动止损/利润锁定启用告警
 ```
 
-通知渠道沿用 `NOTIFICATION_ALERT_CHANNELS` 路由，未新增配置项。单个渠道发送失败不会中断持仓跟踪。
+注入 `notifier` 时（如测试）不依赖 `src.notification` 的可选依赖。通知渠道沿用 `NOTIFICATION_ALERT_CHANNELS` 路由，未新增配置项。单个渠道发送失败不会中断持仓跟踪。
