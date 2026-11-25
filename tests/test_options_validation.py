@@ -64,3 +64,10 @@ def test_noise_is_flagged_overfit():
 def test_insufficient_data():
     rep = walk_forward(lambda p, s, e: [], GRID, START, END)
     assert rep.verdict == "INSUFFICIENT_DATA"
+
+
+def test_thin_oos_sample_is_insufficient_not_overfit():
+    def sparse(params, start, end):
+        return [{"entry_date": start, "exit_date": start, "return_pct": -0.1}]
+    rep = walk_forward(sparse, GRID, START, END, min_train_trades=1)
+    assert rep.verdict == "INSUFFICIENT_DATA"

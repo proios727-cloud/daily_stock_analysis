@@ -247,7 +247,10 @@ def _verdict(folds, oos, efficiency, prof_share, neighbor_share, holdout):
     if not folds:
         return "INSUFFICIENT_DATA", ["No walk-forward fold had enough training trades."]
     if oos.trades < MIN_OOS_TRADES:
-        reasons.append(f"Only {oos.trades} OOS trades (< {MIN_OOS_TRADES}); result is not statistically meaningful.")
+        # Too few unseen trades to call it either way; do not label thin samples as overfit.
+        return "INSUFFICIENT_DATA", [
+            f"Only {oos.trades} OOS trades (< {MIN_OOS_TRADES}); widen the date range, add tickers or loosen the signal."
+        ]
     if oos.expectancy <= 0:
         reasons.append("Pooled OOS expectancy is not positive.")
     if efficiency < MIN_EFFICIENCY:
