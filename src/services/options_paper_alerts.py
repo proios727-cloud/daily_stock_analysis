@@ -40,7 +40,7 @@ class ExitRules:
     trail_pct: float = 0.25          # GUESS
     trail_activation_pct: float = 0.20      # GUESS: trail only after +20%
     lock_trigger_pct: float = 0.50   # GUESS
-    lock_floor_pct: float = 0.25     # GUESS
+    lock_floor_pct: float = 0.30     # GUESS, matches backtester default
 
     def __post_init__(self) -> None:
         for name in ("stop_loss_pct", "trail_pct"):

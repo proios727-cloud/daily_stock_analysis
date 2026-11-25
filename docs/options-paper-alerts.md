@@ -33,7 +33,7 @@ run(params: dict, start: date, end: date) -> list[trade]
 - 生效止损取三者最高，即移动止损追逐峰值，利润锁定保证最低落袋收益
 - 止损判断使用上一根标记前的止损位，避免用同一标记的新高推高止损（无前视）
 
-默认值 `stop_loss_pct=0.35`、`trail_pct=0.25`、`trail_activation_pct=0.20`、`lock_trigger_pct=0.50`、`lock_floor_pct=0.25` 为首版猜测值，应以校验通过的参数替换。
+默认值 `stop_loss_pct=0.35`、`trail_pct=0.25`、`trail_activation_pct=0.20`、`lock_trigger_pct=0.50`、`lock_floor_pct=0.30` 为首版猜测值，应以校验通过的参数替换。
 
 ## 使用示例
 
