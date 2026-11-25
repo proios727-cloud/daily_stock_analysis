@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [chore] 新增 `/brain` 编排 skill 与只读子 agent `brain`（最高档模型、高 effort，仅用于决策点）、`opus-checker`（构建后检查）、`sonnet-checker`（数值核对），并在 `.claude/settings.json` 声明实验性 `advisorModel`。
 - [新功能] 新增 `src/options/` 单腿买入期权权利金回测（`python -m src.options`）：以 `strategies/*.yaml` 的机械化信号入场，按 EOD 买价/卖价成交，支持硬止损、追踪止损与锁盈地板、到期/DTE 退出，按标的输出胜率、期望、最大回撤；数据源 ThetaData 优先、Alpha Vantage 兜底，详见 `docs/options-backtest.md`。
 - [chore] 子 agent 默认模型设为轻量档（`env.CLAUDE_CODE_SUBAGENT_MODEL`），新增中档 `map-builder` 负责需逐字复制的数据拉取。
+- [新功能] 新增期权权利金纸面告警（入场、硬止损、移动止损、利润锁定，走 alert 通知路由，不下单）与 walk-forward / 样本外过拟合校验工具，见 `docs/options-paper-alerts.md`。
 
 ## [3.33.0] - 2026-10-15
 
